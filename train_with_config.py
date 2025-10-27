@@ -7,6 +7,7 @@ import json
 import argparse
 import torch
 from typing import Dict, Any
+from pathlib import Path
 
 from src.config import Config
 from src.data_loader import (
@@ -251,20 +252,149 @@ def create_data_loaders_from_config(config, use_dummy_data=False):
         print(f"  - Test: {len(test_dataset):,} samples")
 
     else:
-        # TODO: Implement real WMT data loading
-        print("🚧 Real WMT data loading not implemented yet")
-        print("📋 To implement:")
-        print("  1. Download WMT 2014 dataset")
-        print("  2. Apply BPE/WordPiece tokenization")
-        print("  3. Create vocabulary")
-        print("  4. Tokenize and encode sentences")
-        print("  5. Create batches by sequence length")
-        print("  6. Ensure ~25k tokens per batch")
+        # 실제 WMT 데이터 로딩
+        print("🔄 Loading real WMT dataset...")
+        
+        # WMT 데이터 로더 임포트
+        try:
+            from src.wmt_data_loader import create_wmt_data_loaders, prepare_sample_data
+            
+            # 데이터 파일이 없으면 샘플 데이터 생성
+            data_path = Path(config.DATA_PATH)
+            lang_dir = data_path / f"{config.SRC_LANG}-{config.TGT_LANG}"
+            train_dir = lang_dir / "train"
+            
+            if not train_dir.exists() or not any(train_dir.iterdir()):
+                print("� No existing data found. Creating sample data...")
+                prepare_sample_data(config)
+            
+            # WMT 데이터 로더 생성
+            train_loader, val_loader, test_loader = create_wmt_data_loaders(config)
+            
+            if train_loader is None:
+                print("⚠️  Failed to load WMT data. Falling back to dummy data...")
+                total_samples = min(100000, config.TRAIN_PAIRS // 100)
+                src_sequences, tgt_sequences = load_dummy_data(num_samples=total_samples)
+                
+                # 더미 데이터로 데이터셋 생성
+                train_size = int(0.8 * len(src_sequences))
+                val_size = int(0.1 * len(src_sequences))
 
-        # For now, fall back to dummy data
-        print("\n⏳ Falling back to dummy data...")
-        total_samples = min(100000, config.APPROXIMATE_SENTENCE_PAIRS // 100)
-        src_sequences, tgt_sequences = load_dummy_data(num_samples=total_samples)
+                train_src = src_sequences[:train_size]
+                train_tgt = tgt_sequences[:train_size]
+                val_src = src_sequences[train_size : train_size + val_size]
+                val_tgt = tgt_sequences[train_size : train_size + val_size]
+                test_src = src_sequences[train_size + val_size :]
+                test_tgt = tgt_sequences[train_size + val_size :]
+
+                # 더미 데이터셋 생성
+                train_dataset = TransformerDataset(
+                    train_src, train_tgt, src_vocab_size, tgt_vocab_size, config.MAX_SEQ_LENGTH,
+                )
+                val_dataset = TransformerDataset(
+                    val_src, val_tgt, src_vocab_size, tgt_vocab_size, config.MAX_SEQ_LENGTH,
+                )
+                test_dataset = TransformerDataset(
+                    test_src, test_tgt, src_vocab_size, tgt_vocab_size, config.MAX_SEQ_LENGTH,
+                )
+                
+                # 더미 데이터 로더 생성
+                train_loader = create_data_loader(train_dataset, config.BATCH_SIZE, shuffle=True)
+                val_loader = create_data_loader(val_dataset, config.BATCH_SIZE, shuffle=False)
+                test_loader = create_data_loader(test_dataset, config.BATCH_SIZE, shuffle=False)
+                
+                print(f"Dataset sizes (dummy data):")
+                print(f"  - Train: {len(train_dataset):,} samples")
+                print(f"  - Validation: {len(val_dataset):,} samples")
+                print(f"  - Test: {len(test_dataset):,} samples")
+            else:
+                print("✅ Successfully loaded WMT data!")
+                
+            return train_loader, val_loader, test_loader
+            
+        except ImportError as e:
+            print(f"⚠️  Failed to import WMT data loader: {e}")
+            print("⏳ Falling back to dummy data...")
+            total_samples = min(100000, config.TRAIN_PAIRS // 100)
+            src_sequences, tgt_sequences = load_dummy_data(num_samples=total_samples)
+            
+            # 더미 데이터로 데이터셋 생성 (else 블록과 동일)
+            train_size = int(0.8 * len(src_sequences))
+            val_size = int(0.1 * len(src_sequences))
+
+            train_src = src_sequences[:train_size]
+            train_tgt = tgt_sequences[:train_size]
+            val_src = src_sequences[train_size : train_size + val_size]
+            val_tgt = tgt_sequences[train_size : train_size + val_size]
+            test_src = src_sequences[train_size + val_size :]
+            test_tgt = tgt_sequences[train_size + val_size :]
+
+            # 더미 데이터셋 생성
+            train_dataset = TransformerDataset(
+                train_src, train_tgt, src_vocab_size, tgt_vocab_size, config.MAX_SEQ_LENGTH,
+            )
+            val_dataset = TransformerDataset(
+                val_src, val_tgt, src_vocab_size, tgt_vocab_size, config.MAX_SEQ_LENGTH,
+            )
+            test_dataset = TransformerDataset(
+                test_src, test_tgt, src_vocab_size, tgt_vocab_size, config.MAX_SEQ_LENGTH,
+            )
+            
+            # 더미 데이터 로더 생성
+            train_loader = create_data_loader(train_dataset, config.BATCH_SIZE, shuffle=True)
+            val_loader = create_data_loader(val_dataset, config.BATCH_SIZE, shuffle=False)
+            test_loader = create_data_loader(test_dataset, config.BATCH_SIZE, shuffle=False)
+            
+            print(f"Dataset sizes (dummy fallback):")
+            print(f"  - Train: {len(train_dataset):,} samples")
+            print(f"  - Validation: {len(val_dataset):,} samples")
+            print(f"  - Test: {len(test_dataset):,} samples")
+            
+            return train_loader, val_loader, test_loader
+
+    # 더미 데이터용 (use_dummy_data == True인 경우)
+    # Split data
+    train_size = int(0.8 * len(src_sequences))
+    val_size = int(0.1 * len(src_sequences))
+
+    train_src = src_sequences[:train_size]
+    train_tgt = tgt_sequences[:train_size]
+
+    val_src = src_sequences[train_size : train_size + val_size]
+    val_tgt = tgt_sequences[train_size : train_size + val_size]
+
+    test_src = src_sequences[train_size + val_size :]
+    test_tgt = tgt_sequences[train_size + val_size :]
+
+    # Create datasets
+    train_dataset = TransformerDataset(
+        train_src,
+        train_tgt,
+        src_vocab_size,
+        tgt_vocab_size,
+        config.MAX_SEQ_LENGTH,
+    )
+
+    val_dataset = TransformerDataset(
+        val_src,
+        val_tgt,
+        src_vocab_size,
+        tgt_vocab_size,
+        config.MAX_SEQ_LENGTH,
+    )
+
+    test_dataset = TransformerDataset(
+        test_src,
+        test_tgt,
+        src_vocab_size,
+        tgt_vocab_size,
+        config.MAX_SEQ_LENGTH,
+    )
+
+    print(f"Dataset sizes:")
+    print(f"  - Train: {len(train_dataset):,} samples")
+    print(f"  - Validation: {len(val_dataset):,} samples")
+    print(f"  - Test: {len(test_dataset):,} samples")
 
     # Create data loaders
     train_loader = create_data_loader(
