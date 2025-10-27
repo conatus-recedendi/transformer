@@ -21,11 +21,17 @@
   },
 
   "data": {
+    "dataset": "wmt14_en_de",
     "vocab_size": 50000,
+    "shared_vocab": true,
+    "encoding": "bpe",
+    "approximate_sentence_pairs": 4500000,
     "pad_token": 0,
     "bos_token": 1,
     "eos_token": 2,
-    "unk_token": 3
+    "unk_token": 3,
+    "src_lang": "en",
+    "tgt_lang": "de"
   },
 
   "evaluation": {
