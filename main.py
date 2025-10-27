@@ -169,23 +169,51 @@ def load_data(config: Config, use_dummy: bool = True):
             config.MAX_SEQ_LENGTH,
         )
 
+        # Create data loaders
+        train_loader = create_data_loader(
+            train_dataset,
+            config.BATCH_SIZE,
+            shuffle=True,
+            pad_token_id=config.PAD_TOKEN,
+        )
+
+        val_loader = create_data_loader(
+            val_dataset, config.BATCH_SIZE, shuffle=False, pad_token_id=config.PAD_TOKEN
+        )
+
+        test_loader = create_data_loader(
+            test_dataset,
+            config.BATCH_SIZE,
+            shuffle=False,
+            pad_token_id=config.PAD_TOKEN,
+        )
+
     else:
-        # TODO: Implement real data loading
-        # This is where you would load your actual dataset
-        raise NotImplementedError("Real data loading not implemented yet")
+        # 실제 WMT 데이터 로딩
+        print("Loading real WMT data...")
 
-    # Create data loaders
-    train_loader = create_data_loader(
-        train_dataset, config.BATCH_SIZE, shuffle=True, pad_token_id=config.PAD_TOKEN
-    )
+        try:
+            from src.real_data_loader import load_real_wmt_data
 
-    val_loader = create_data_loader(
-        val_dataset, config.BATCH_SIZE, shuffle=False, pad_token_id=config.PAD_TOKEN
-    )
+            # config에 DATASET 속성이 없으면 기본값 설정
+            if not hasattr(config, "DATASET"):
+                config.DATASET = "wmt14_en_de"
 
-    test_loader = create_data_loader(
-        test_dataset, config.BATCH_SIZE, shuffle=False, pad_token_id=config.PAD_TOKEN
-    )
+            train_loader, val_loader, test_loader = load_real_wmt_data(config)
+
+            if train_loader is None:
+                print("❌ Failed to load real data. Check if data files exist:")
+                print(f"   Expected location: {config.DATA_PATH}{config.DATASET}/")
+                print(f"   Expected files: train.txt, valid.txt, test.txt")
+                print(
+                    "   File format: each line should be 'source_sentence\\ttarget_sentence'"
+                )
+                raise FileNotFoundError("Real data files not found")
+
+        except (ImportError, FileNotFoundError) as e:
+            print(f"⚠️  Error loading real data: {e}")
+            print("   Falling back to dummy data...")
+            return load_data(config, use_dummy=True)
 
     print(f"Train batches: {len(train_loader)}")
     print(f"Val batches: {len(val_loader)}")
