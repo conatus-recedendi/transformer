@@ -20,7 +20,7 @@ class SimpleVocabulary:
     def __init__(self):
         self.token_to_id = {}
         self.id_to_token = {}
-        self.special_tokens = {"<pad>": 0, "<bos>": 1, "<eos>": 2, "<unk>": 3}
+        self.special_tokens = {"<PAD>": 0, "<BOS>": 1, "<EOS>": 2, "<UNK>": 3}
 
         # 특수 토큰 추가
         for token, idx in self.special_tokens.items():
@@ -68,13 +68,13 @@ class SimpleVocabulary:
     def encode(self, tokens: List[str]) -> List[int]:
         """토큰들을 ID로 변환"""
         return [
-            self.token_to_id.get(token, self.special_tokens["<unk>"])
+            self.token_to_id.get(token, self.special_tokens["<UNK>"])
             for token in tokens
         ]
 
     def decode(self, ids: List[int]) -> List[str]:
         """ID들을 토큰으로 변환"""
-        return [self.id_to_token.get(id, "<unk>") for id in ids]
+        return [self.id_to_token.get(id, "<UNK>") for id in ids]
 
     def __len__(self):
         return len(self.token_to_id)
