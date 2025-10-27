@@ -1,0 +1,41 @@
+{
+  "experiment_name": "transformer_small",
+  "description": "Smaller Transformer model for quick testing and debugging",
+
+  "model": {
+    "model_dim": 256,
+    "num_heads": 4,
+    "num_encoder_layers": 3,
+    "num_decoder_layers": 3,
+    "ffn_dim": 1024,
+    "dropout": 0.1,
+    "max_seq_length": 256
+  },
+
+  "training": {
+    "batch_size": 64,
+    "learning_rate": 5e-4,
+    "warmup_steps": 2000,
+    "max_epochs": 50,
+    "gradient_clip": 1.0
+  },
+
+  "data": {
+    "vocab_size": 10000,
+    "pad_token": 0,
+    "bos_token": 1,
+    "eos_token": 2,
+    "unk_token": 3
+  },
+
+  "evaluation": {
+    "eval_every": 200,
+    "save_every": 500
+  },
+
+  "paths": {
+    "data_path": "data/",
+    "model_save_path": "checkpoints/small/",
+    "log_path": "logs/small/"
+  }
+}
