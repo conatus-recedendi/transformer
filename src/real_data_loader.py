@@ -28,7 +28,7 @@ class SimpleVocabulary:
             self.id_to_token[idx] = token
 
     def build_from_files(self, file_paths: List[str], vocab_size: int = 30000):
-        """파일들로부터 어휘 사전 구축"""
+        """파일들로부터 어휘 사전 구축 (분리된 언어 파일들 처리)"""
         logger.info(f"Building vocabulary from {len(file_paths)} files...")
 
         token_counter = Counter()
@@ -39,13 +39,10 @@ class SimpleVocabulary:
                 logger.info(f"Processing {file_path}...")
                 with open(file_path, "r", encoding="utf-8") as f:
                     for line in f:
-                        # 탭으로 분리된 소스와 타겟 문장
-                        parts = line.strip().split("\t")
-                        if len(parts) >= 2:
-                            src_tokens = parts[0].split()
-                            tgt_tokens = parts[1].split()
-                            token_counter.update(src_tokens)
-                            token_counter.update(tgt_tokens)
+                        line = line.strip()
+                        if line:
+                            tokens = line.split()
+                            token_counter.update(tokens)
                             total_lines += 1
 
                         if total_lines % 10000 == 0:
@@ -84,50 +81,57 @@ class SimpleVocabulary:
 
 
 class RealWMTDataset(Dataset):
-    """실제 WMT 데이터셋 클래스 (탭 분리 형식)"""
+    """실제 WMT 데이터셋 클래스 (분리된 언어 파일 형식: train.en, train.de)"""
 
-    def __init__(self, file_path: str, vocab: SimpleVocabulary, max_length: int = 512):
-        self.file_path = file_path
+    def __init__(
+        self,
+        src_file: str,
+        tgt_file: str,
+        vocab: SimpleVocabulary,
+        max_length: int = 512,
+    ):
+        self.src_file = src_file
+        self.tgt_file = tgt_file
         self.vocab = vocab
         self.max_length = max_length
 
         # 데이터 로드
         self.data_pairs = self._load_data()
 
-        logger.info(f"Loaded {len(self.data_pairs)} sentence pairs from {file_path}")
+        logger.info(f"Loaded {len(self.data_pairs)} sentence pairs")
+        logger.info(f"  Source file: {src_file}")
+        logger.info(f"  Target file: {tgt_file}")
 
     def _load_data(self) -> List[Tuple[List[str], List[str]]]:
-        """데이터 파일 로드"""
+        """분리된 언어 파일들 로드"""
         data_pairs = []
 
-        if not os.path.exists(self.file_path):
-            logger.warning(f"Data file not found: {self.file_path}")
+        if not os.path.exists(self.src_file) or not os.path.exists(self.tgt_file):
+            logger.warning(f"Data files not found: {self.src_file} or {self.tgt_file}")
             return data_pairs
 
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            for line_num, line in enumerate(f):
-                line = line.strip()
-                if not line:
+        with open(self.src_file, "r", encoding="utf-8") as f_src, open(
+            self.tgt_file, "r", encoding="utf-8"
+        ) as f_tgt:
+
+            for line_num, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt)):
+                src_line = src_line.strip()
+                tgt_line = tgt_line.strip()
+
+                if not src_line or not tgt_line:
                     continue
 
-                # 탭으로 분리된 소스와 타겟 문장
-                parts = line.split("\t")
-                if len(parts) >= 2:
-                    src_tokens = parts[0].split()
-                    tgt_tokens = parts[1].split()
+                src_tokens = src_line.split()
+                tgt_tokens = tgt_line.split()
 
-                    # 길이 제한 및 빈 라인 필터링
-                    if (
-                        len(src_tokens) > 0
-                        and len(tgt_tokens) > 0
-                        and len(src_tokens) <= self.max_length
-                        and len(tgt_tokens) <= self.max_length
-                    ):
-                        data_pairs.append((src_tokens, tgt_tokens))
-                else:
-                    logger.warning(
-                        f"Invalid line format at line {line_num + 1}: {line}"
-                    )
+                # 길이 제한 및 빈 라인 필터링
+                if (
+                    len(src_tokens) > 0
+                    and len(tgt_tokens) > 0
+                    and len(src_tokens) <= self.max_length
+                    and len(tgt_tokens) <= self.max_length
+                ):
+                    data_pairs.append((src_tokens, tgt_tokens))
 
         return data_pairs
 
@@ -179,37 +183,65 @@ def collate_fn_real(batch, pad_token_id: int = 0):
 
 
 def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
-    """실제 WMT 데이터 로드"""
+    """실제 WMT 데이터 로드 (분리된 언어 파일 형식: train.en, train.de 등)"""
     logger.info("Loading real WMT data...")
 
     # 데이터 경로 설정
     data_path = Path(config.DATA_PATH)
     dataset_path = data_path / config.DATASET
 
-    train_file = dataset_path / "train.txt"
-    valid_file = dataset_path / "valid.txt"
-    test_file = dataset_path / "test.txt"
+    # config에서 언어 정보 가져오기
+    src_lang = getattr(config, "SRC_LANG", "en")
+    tgt_lang = getattr(config, "TGT_LANG", "de")
+
+    # 분리된 언어 파일 경로
+    train_src_file = dataset_path / f"train.{src_lang}"
+    train_tgt_file = dataset_path / f"train.{tgt_lang}"
+    valid_src_file = dataset_path / f"valid.{src_lang}"
+    valid_tgt_file = dataset_path / f"valid.{tgt_lang}"
+    test_src_file = dataset_path / f"test.{src_lang}"
+    test_tgt_file = dataset_path / f"test.{tgt_lang}"
 
     # 파일 존재 확인
-    files_exist = all(f.exists() for f in [train_file, valid_file, test_file])
+    required_files = [
+        train_src_file,
+        train_tgt_file,
+        valid_src_file,
+        valid_tgt_file,
+        test_src_file,
+        test_tgt_file,
+    ]
+    files_exist = all(f.exists() for f in required_files)
+
     if not files_exist:
         logger.error(f"Data files not found in {dataset_path}")
-        logger.error(f"Expected files: train.txt, valid.txt, test.txt")
+        logger.error(f"Expected files:")
+        for f in required_files:
+            status = "✓" if f.exists() else "✗"
+            logger.error(f"  {status} {f.name}")
         return None, None, None
 
     logger.info(f"Found data files in {dataset_path}")
-    logger.info(f"  Train: {train_file}")
-    logger.info(f"  Valid: {valid_file}")
-    logger.info(f"  Test: {test_file}")
+    logger.info(f"  Language pair: {src_lang} → {tgt_lang}")
+    logger.info(f"  Train: {train_src_file.name}, {train_tgt_file.name}")
+    logger.info(f"  Valid: {valid_src_file.name}, {valid_tgt_file.name}")
+    logger.info(f"  Test: {test_src_file.name}, {test_tgt_file.name}")
 
-    # 어휘 사전 구축
+    # 어휘 사전 구축 (훈련 데이터에서)
     vocab = SimpleVocabulary()
-    vocab.build_from_files([str(train_file)], config.VOCAB_SIZE)
+    vocab_files = [str(train_src_file), str(train_tgt_file)]
+    vocab.build_from_files(vocab_files, config.VOCAB_SIZE)
 
     # 데이터셋 생성
-    train_dataset = RealWMTDataset(str(train_file), vocab, config.MAX_SEQ_LENGTH)
-    val_dataset = RealWMTDataset(str(valid_file), vocab, config.MAX_SEQ_LENGTH)
-    test_dataset = RealWMTDataset(str(test_file), vocab, config.MAX_SEQ_LENGTH)
+    train_dataset = RealWMTDataset(
+        str(train_src_file), str(train_tgt_file), vocab, config.MAX_SEQ_LENGTH
+    )
+    val_dataset = RealWMTDataset(
+        str(valid_src_file), str(valid_tgt_file), vocab, config.MAX_SEQ_LENGTH
+    )
+    test_dataset = RealWMTDataset(
+        str(test_src_file), str(test_tgt_file), vocab, config.MAX_SEQ_LENGTH
+    )
 
     logger.info(f"Dataset sizes:")
     logger.info(f"  Train: {len(train_dataset):,} samples")

@@ -56,6 +56,11 @@ def parse_arguments():
     parser.add_argument(
         "--max_seq_length", type=int, default=512, help="Maximum sequence length"
     )
+    parser.add_argument(
+        "--dataset", type=str, default="wmt14_en_de", help="Dataset name"
+    )
+    parser.add_argument("--src_lang", type=str, default="en", help="Source language")
+    parser.add_argument("--tgt_lang", type=str, default="de", help="Target language")
 
     # File paths
     parser.add_argument(
@@ -111,6 +116,9 @@ def setup_config(args) -> Config:
         "DATA_PATH": args.data_path,
         "MODEL_SAVE_PATH": args.model_save_path,
         "LOG_PATH": args.log_path,
+        "DATASET": args.dataset,
+        "SRC_LANG": args.src_lang,
+        "TGT_LANG": args.tgt_lang,
     }
 
     # Setup device
@@ -204,10 +212,10 @@ def load_data(config: Config, use_dummy: bool = True):
             if train_loader is None:
                 print("❌ Failed to load real data. Check if data files exist:")
                 print(f"   Expected location: {config.DATA_PATH}{config.DATASET}/")
-                print(f"   Expected files: train.txt, valid.txt, test.txt")
                 print(
-                    "   File format: each line should be 'source_sentence\\ttarget_sentence'"
+                    f"   Expected files: train.{config.SRC_LANG}, train.{config.TGT_LANG}, valid.{config.SRC_LANG}, valid.{config.TGT_LANG}, test.{config.SRC_LANG}, test.{config.TGT_LANG}"
                 )
+                print("   File format: each line should contain one sentence")
                 raise FileNotFoundError("Real data files not found")
 
         except (ImportError, FileNotFoundError) as e:

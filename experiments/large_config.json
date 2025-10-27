@@ -5,10 +5,10 @@
   "model": {
     "model_dim": 1024,
     "num_heads": 16,
-    "num_encoder_layers": 12,
-    "num_decoder_layers": 12,
+    "num_encoder_layers": 6,
+    "num_decoder_layers": 6,
     "ffn_dim": 4096,
-    "dropout": 0.1,
+    "dropout": 0.3,
     "max_seq_length": 1024
   },
 
