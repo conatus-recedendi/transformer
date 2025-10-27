@@ -104,6 +104,9 @@ class Trainer:
 
     def _setup_logging(self):
         """Setup logging configuration"""
+        # Ensure log directory exists
+        os.makedirs(self.config.LOG_PATH, exist_ok=True)
+
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
