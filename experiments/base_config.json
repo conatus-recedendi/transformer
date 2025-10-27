@@ -38,8 +38,8 @@
   },
 
   "evaluation": {
-    "eval_every": 500,
-    "save_every": 1000
+    "eval_every": 1000,
+    "save_every": 50000
   },
 
   "paths": {
