@@ -146,8 +146,8 @@ class RealWMTDataset(Dataset):
         tgt_ids = self.vocab.encode(tgt_tokens)
 
         # BOS/EOS 토큰 추가
-        tgt_input = [self.vocab.special_tokens["<bos>"]] + tgt_ids
-        tgt_output = tgt_ids + [self.vocab.special_tokens["<eos>"]]
+        tgt_input = [self.vocab.special_tokens["<BOS>"]] + tgt_ids
+        tgt_output = tgt_ids + [self.vocab.special_tokens["<EOS>"]]
 
         return {
             "src": torch.tensor(src_ids, dtype=torch.long),
