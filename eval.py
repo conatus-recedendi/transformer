@@ -149,9 +149,9 @@ class BeamSearchDecoder:
         batch_size = src.size(0)
         assert batch_size == 1, "Beam search currently supports batch_size=1 only"
 
-        # Encode source
-        with torch.no_grad():
-            memory = self.model.encoder(src, src_mask)  # [1, src_len, d_model]
+        # Store source for beam search
+        self.src = src
+        self.pad_token = pad_token
 
         # Initialize beam
         # Each beam item: (sequence, score, finished)
@@ -176,18 +176,20 @@ class BeamSearchDecoder:
                 ).bool()
                 tgt_mask = tgt_mask.unsqueeze(0)  # [1, tgt_len, tgt_len]
 
-                # Forward pass
+                # Forward pass using the complete model
                 with torch.no_grad():
-                    output = self.model.decoder(
-                        tgt, memory, tgt_mask, src_mask
-                    )  # [1, seq_len, d_model]
-                    logits = self.model.output_projection(
-                        output[:, -1, :]
-                    )  # [1, vocab_size]
+                    # Use full model forward pass
+                    model_output = self.model(self.src, tgt)  # [1, seq_len, vocab_size]
+                    logits = model_output[:, -1, :]  # [1, vocab_size] - last position
                     log_probs = F.log_softmax(logits, dim=-1)  # [1, vocab_size]
 
                 # Get top-k candidates
                 top_log_probs, top_indices = log_probs.topk(self.beam_size, dim=-1)
+
+                # Debug: log predictions for first step
+                if step == 0 and len(beams) == 1:
+                    print(f"Step {step}: Top predictions: {top_indices.cpu().numpy()}")
+                    print(f"Step {step}: Top log_probs: {top_log_probs.cpu().numpy()}")
 
                 for i in range(self.beam_size):
                     token_id = top_indices[0, i].item()
@@ -216,6 +218,7 @@ class BeamSearchDecoder:
 
             # Early stopping check
             if self.early_stopping and all(finished for _, _, finished in beams):
+                print(f"Early stopping at step {step}")
                 break
 
         # Combine beams and finished beams
@@ -430,6 +433,11 @@ class ModelEvaluator:
                             eos_token=self.config.EOS_TOKEN,
                             pad_token=self.config.PAD_TOKEN,
                         )
+
+                        # Debug: log raw prediction tokens
+                        if batch_idx == 0 and i == 0:  # First example only
+                            self.logger.info(f"Raw pred_tokens: {pred_tokens}")
+
                     except Exception as e:
                         self.logger.warning(
                             f"Error in beam search for batch {batch_idx}, example {i}: {e}"
@@ -437,7 +445,7 @@ class ModelEvaluator:
                         pred_tokens = [self.config.EOS_TOKEN]
 
                     # Remove BOS/EOS tokens and convert to text
-                    pred_tokens = [
+                    pred_tokens_clean = [
                         t
                         for t in pred_tokens
                         if t
@@ -458,24 +466,53 @@ class ModelEvaluator:
                         ]
                     ]
 
+                    # Debug: log cleaned tokens
+                    if batch_idx == 0 and i == 0:  # First example only
+                        self.logger.info(f"Cleaned pred_tokens: {pred_tokens_clean}")
+                        self.logger.info(f"Cleaned ref_tokens: {ref_tokens}")
+
                     # Convert to text using vocabulary
                     try:
                         if hasattr(vocab, "decode"):
                             # BPE vocabulary
-                            pred_text = vocab.decode(pred_tokens)
-                            ref_text = vocab.decode(ref_tokens)
+                            if pred_tokens_clean:  # Check if not empty
+                                pred_text = vocab.decode(pred_tokens_clean)
+                            else:
+                                pred_text = ""
+
+                            if ref_tokens:  # Check if not empty
+                                ref_text = vocab.decode(ref_tokens)
+                            else:
+                                ref_text = ""
 
                             # Tokenize for BLEU calculation
-                            pred_words = pred_text.split()
-                            ref_words = ref_text.split()
+                            pred_words = (
+                                pred_text.split() if pred_text.strip() else ["<EMPTY>"]
+                            )
+                            ref_words = (
+                                ref_text.split() if ref_text.strip() else ["<EMPTY>"]
+                            )
                         else:
                             # Simple vocabulary
-                            pred_words = vocab.decode(pred_tokens)
-                            ref_words = vocab.decode(ref_tokens)
+                            if pred_tokens_clean:
+                                pred_words = vocab.decode(pred_tokens_clean)
+                            else:
+                                pred_words = ["<EMPTY>"]
+
+                            if ref_tokens:
+                                ref_words = vocab.decode(ref_tokens)
+                            else:
+                                ref_words = ["<EMPTY>"]
+
                     except Exception as e:
                         self.logger.warning(f"Error in vocabulary decoding: {e}")
                         pred_words = ["<UNK>"]
                         ref_words = ["<UNK>"]
+
+                    # Debug: log final words
+                    if batch_idx == 0 and i == 0:  # First example only
+                        self.logger.info(f"Final pred_words: {pred_words}")
+                        self.logger.info(f"Final ref_words: {ref_words}")
 
                     all_predictions.append(pred_words)
                     all_references.append(ref_words)
