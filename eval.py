@@ -181,7 +181,7 @@ class BeamSearchDecoder:
                     output = self.model.decoder(
                         tgt, memory, tgt_mask, src_mask
                     )  # [1, seq_len, d_model]
-                    logits = self.model.tgt_embedding.projection(
+                    logits = self.model.output_projection(
                         output[:, -1, :]
                     )  # [1, vocab_size]
                     log_probs = F.log_softmax(logits, dim=-1)  # [1, vocab_size]
