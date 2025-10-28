@@ -99,6 +99,8 @@ def load_config_from_json(config_path: str) -> Config:
                 "EVAL_EVERY": evaluation.get("eval_every", 500),
                 "SAVE_EVERY": evaluation.get("save_every", 1000),
                 "N_CHECKPOINTS": evaluation.get("n_checkpoints", 5),
+                "BEAM_SIZE": evaluation.get("beam_size", 4),
+                "LENGTH_PENALTY": evaluation.get("length_penalty", 0.6),
             }
         )
 

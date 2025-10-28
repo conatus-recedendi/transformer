@@ -55,6 +55,8 @@ class Config:
         self.N_CHECKPOINTS = (
             5  # Number of checkpoints to average (5 for base, 20 for big model)
         )
+        self.BEAM_SIZE = 4  # Beam size for beam search
+        self.LENGTH_PENALTY = 0.6  # Length penalty for beam search
 
         # File paths (matching paths section in JSON)
         self.DATA_PATH = "data/"
@@ -132,6 +134,8 @@ class Config:
                 "eval_every": self.EVAL_EVERY,
                 "save_every": self.SAVE_EVERY,
                 "n_checkpoints": self.N_CHECKPOINTS,
+                "beam_size": self.BEAM_SIZE,
+                "length_penalty": self.LENGTH_PENALTY,
             },
             "paths": {
                 "data_path": self.DATA_PATH,
@@ -217,6 +221,10 @@ class Config:
             config.EVAL_EVERY = evaluation.get("eval_every", config.EVAL_EVERY)
             config.SAVE_EVERY = evaluation.get("save_every", config.SAVE_EVERY)
             config.N_CHECKPOINTS = evaluation.get("n_checkpoints", config.N_CHECKPOINTS)
+            config.BEAM_SIZE = evaluation.get("beam_size", config.BEAM_SIZE)
+            config.LENGTH_PENALTY = evaluation.get(
+                "length_penalty", config.LENGTH_PENALTY
+            )
 
         # Paths
         if "paths" in json_data:

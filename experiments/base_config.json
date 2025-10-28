@@ -39,7 +39,10 @@
 
   "evaluation": {
     "eval_every": 1000,
-    "save_every": 50000
+    "save_every": 50000,
+    "n_checkpoints": 5,
+    "beam_size": 4,
+    "length_penalty": 0.6
   },
 
   "paths": {

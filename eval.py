@@ -242,9 +242,9 @@ class ModelEvaluator:
         self.model = None
         self.vocab = None  # Will be set when loading data
 
-        # Beam search parameters (from paper)
-        self.beam_size = 4
-        self.length_penalty = 0.6
+        # Beam search parameters (from config or paper defaults)
+        self.beam_size = getattr(config, "BEAM_SIZE", 4)
+        self.length_penalty = getattr(config, "LENGTH_PENALTY", 0.6)
         self.max_output_length_offset = 50  # input_length + 50
 
     def _setup_logging(self):
@@ -577,6 +577,14 @@ def main():
     else:
         device = get_device()
         config.DEVICE = str(device)
+
+    # Override command line arguments with config values if not explicitly set
+    if args.n_checkpoints == 5:  # Default value
+        args.n_checkpoints = getattr(config, "N_CHECKPOINTS", 5)
+    if args.beam_size == 4:  # Default value
+        args.beam_size = getattr(config, "BEAM_SIZE", 4)
+    if args.length_penalty == 0.6:  # Default value
+        args.length_penalty = getattr(config, "LENGTH_PENALTY", 0.6)
 
     print("\n" + "=" * 60)
     print("TRANSFORMER MODEL EVALUATION")
