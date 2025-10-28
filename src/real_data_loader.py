@@ -51,7 +51,7 @@ class BPEVocabulary:
                                 outf.write(line + "\n")
                                 total_lines += 1
 
-                            if total_lines % 10000 == 0:
+                            if total_lines % 1_000_000 == 0:
                                 logger.info(f"  Processed {total_lines} lines...")
 
         logger.info(f"Total lines for BPE training: {total_lines}")
