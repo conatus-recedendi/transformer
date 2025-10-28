@@ -10,74 +10,120 @@ from typing import List, Tuple, Dict, Optional
 from torch.utils.data import Dataset, DataLoader
 from collections import Counter
 import logging
+import sentencepiece as spm
 
 logger = logging.getLogger(__name__)
 
 
-class SimpleVocabulary:
-    """간단한 어휘 사전"""
+class BPEVocabulary:
+    """BPE(Byte Pair Encoding) 기반 어휘 사전"""
 
     def __init__(self):
-        self.token_to_id = {}
-        self.id_to_token = {}
+        self.sp_model = None
+        self.vocab_size = 30000
         self.special_tokens = {"<PAD>": 0, "<BOS>": 1, "<EOS>": 2, "<UNK>": 3}
+        self.model_path = None
 
-        # 특수 토큰 추가
-        for token, idx in self.special_tokens.items():
-            self.token_to_id[token] = idx
-            self.id_to_token[idx] = token
+    def train_bpe_model(
+        self,
+        file_paths: List[str],
+        vocab_size: int = 30000,
+        model_prefix: str = "bpe_model",
+    ):
+        """BPE 모델 훈련"""
+        logger.info(f"Training BPE model from {len(file_paths)} files...")
 
-    def build_from_files(self, file_paths: List[str], vocab_size: int = 30000):
-        """파일들로부터 어휘 사전 구축 (분리된 언어 파일들 처리)"""
-        logger.info(f"Building vocabulary from {len(file_paths)} files...")
+        self.vocab_size = vocab_size
+        self.model_path = f"{model_prefix}.model"
 
-        token_counter = Counter()
+        # 모든 파일을 하나로 합치기
+        combined_file = f"{model_prefix}_combined.txt"
         total_lines = 0
 
-        for file_path in file_paths:
-            if os.path.exists(file_path):
-                logger.info(f"Processing {file_path}...")
-                with open(file_path, "r", encoding="utf-8") as f:
-                    for line in f:
-                        line = line.strip()
-                        if line:
-                            tokens = line.split()
-                            token_counter.update(tokens)
-                            total_lines += 1
+        with open(combined_file, "w", encoding="utf-8") as outf:
+            for file_path in file_paths:
+                if os.path.exists(file_path):
+                    logger.info(f"Processing {file_path}...")
+                    with open(file_path, "r", encoding="utf-8") as inf:
+                        for line in inf:
+                            line = line.strip()
+                            if line:
+                                outf.write(line + "\n")
+                                total_lines += 1
 
-                        if total_lines % 10000 == 0:
-                            logger.info(f"  Processed {total_lines} lines...")
+                            if total_lines % 10000 == 0:
+                                logger.info(f"  Processed {total_lines} lines...")
 
-        logger.info(f"Total tokens: {sum(token_counter.values())}")
-        logger.info(f"Unique tokens: {len(token_counter)}")
+        logger.info(f"Total lines for BPE training: {total_lines}")
 
-        # 가장 빈번한 토큰들 선택
-        vocab_size_without_special = vocab_size - len(self.special_tokens)
-        most_common = token_counter.most_common(vocab_size_without_special)
+        # BPE 모델 훈련
+        spm.SentencePieceTrainer.train(
+            input=combined_file,
+            model_prefix=model_prefix,
+            vocab_size=vocab_size,
+            character_coverage=0.995,
+            model_type="bpe",
+            pad_id=self.special_tokens["<PAD>"],
+            bos_id=self.special_tokens["<BOS>"],
+            eos_id=self.special_tokens["<EOS>"],
+            unk_id=self.special_tokens["<UNK>"],
+            pad_piece="<PAD>",
+            bos_piece="<BOS>",
+            eos_piece="<EOS>",
+            unk_piece="<UNK>",
+            user_defined_symbols=["<PAD>", "<BOS>", "<EOS>", "<UNK>"],
+        )
 
-        # 어휘 사전 구축
-        next_id = len(self.special_tokens)
-        for token, freq in most_common:
-            if token not in self.token_to_id:
-                self.token_to_id[token] = next_id
-                self.id_to_token[next_id] = token
-                next_id += 1
+        # 임시 파일 삭제
+        os.remove(combined_file)
 
-        logger.info(f"Vocabulary built: {len(self.token_to_id)} tokens")
+        # 모델 로드
+        self.load_model(self.model_path)
 
-    def encode(self, tokens: List[str]) -> List[int]:
-        """토큰들을 ID로 변환"""
-        return [
-            self.token_to_id.get(token, self.special_tokens["<UNK>"])
-            for token in tokens
-        ]
+        logger.info(f"BPE model trained and saved: {self.model_path}")
+        logger.info(f"Vocabulary size: {len(self)}")
 
-    def decode(self, ids: List[int]) -> List[str]:
-        """ID들을 토큰으로 변환"""
-        return [self.id_to_token.get(id, "<UNK>") for id in ids]
+    def load_model(self, model_path: str):
+        """훈련된 BPE 모델 로드"""
+        self.sp_model = spm.SentencePieceProcessor()
+        self.sp_model.load(model_path)
+        self.model_path = model_path
+        logger.info(f"BPE model loaded from {model_path}")
+
+    def encode(self, text: str) -> List[int]:
+        """텍스트를 BPE 토큰 ID로 변환"""
+        if self.sp_model is None:
+            raise ValueError(
+                "BPE model not loaded. Call train_bpe_model() or load_model() first."
+            )
+
+        if isinstance(text, list):
+            # 토큰 리스트가 입력된 경우 공백으로 결합
+            text = " ".join(text)
+
+        return self.sp_model.encode_as_ids(text)
+
+    def decode(self, ids: List[int]) -> str:
+        """BPE 토큰 ID를 텍스트로 변환"""
+        if self.sp_model is None:
+            raise ValueError("BPE model not loaded.")
+
+        return self.sp_model.decode_ids(ids)
+
+    def encode_as_pieces(self, text: str) -> List[str]:
+        """텍스트를 BPE 토큰 조각으로 변환"""
+        if self.sp_model is None:
+            raise ValueError("BPE model not loaded.")
+
+        if isinstance(text, list):
+            text = " ".join(text)
+
+        return self.sp_model.encode_as_pieces(text)
 
     def __len__(self):
-        return len(self.token_to_id)
+        if self.sp_model is None:
+            return self.vocab_size
+        return self.sp_model.get_piece_size()
 
 
 class RealWMTDataset(Dataset):
@@ -87,7 +133,7 @@ class RealWMTDataset(Dataset):
         self,
         src_file: str,
         tgt_file: str,
-        vocab: SimpleVocabulary,
+        vocab: BPEVocabulary,
         max_length: int = 512,
     ):
         self.src_file = src_file
@@ -102,8 +148,8 @@ class RealWMTDataset(Dataset):
         logger.info(f"  Source file: {src_file}")
         logger.info(f"  Target file: {tgt_file}")
 
-    def _load_data(self) -> List[Tuple[List[str], List[str]]]:
-        """분리된 언어 파일들 로드"""
+    def _load_data(self) -> List[Tuple[str, str]]:
+        """분리된 언어 파일들 로드 (BPE용으로 원문 텍스트 반환)"""
         data_pairs = []
 
         if not os.path.exists(self.src_file) or not os.path.exists(self.tgt_file):
@@ -121,8 +167,8 @@ class RealWMTDataset(Dataset):
                 if not src_line or not tgt_line:
                     continue
 
-                src_tokens = src_line.split()
-                tgt_tokens = tgt_line.split()
+                src_tokens = src_line.strip()
+                tgt_tokens = tgt_line.strip()
 
                 # 길이 제한 및 빈 라인 필터링
                 if (
@@ -139,11 +185,11 @@ class RealWMTDataset(Dataset):
         return len(self.data_pairs)
 
     def __getitem__(self, idx):
-        src_tokens, tgt_tokens = self.data_pairs[idx]
+        src_text, tgt_text = self.data_pairs[idx]
 
-        # 토큰을 ID로 변환
-        src_ids = self.vocab.encode(src_tokens)
-        tgt_ids = self.vocab.encode(tgt_tokens)
+        # BPE로 토큰을 ID로 변환
+        src_ids = self.vocab.encode(src_text)
+        tgt_ids = self.vocab.encode(tgt_text)
 
         # BOS/EOS 토큰 추가
         tgt_input = [self.vocab.special_tokens["<BOS>"]] + tgt_ids
@@ -195,12 +241,18 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
     tgt_lang = getattr(config, "TGT_LANG", "de")
 
     # 분리된 언어 파일 경로
-    train_src_file = dataset_path / f"train.{src_lang}"
-    train_tgt_file = dataset_path / f"train.{tgt_lang}"
-    valid_src_file = dataset_path / f"valid.{src_lang}"
-    valid_tgt_file = dataset_path / f"valid.{tgt_lang}"
-    test_src_file = dataset_path / f"test.{src_lang}"
-    test_tgt_file = dataset_path / f"test.{tgt_lang}"
+    # train_src_file = dataset_path / f"train.{src_lang}"
+    # train_tgt_file = dataset_path / f"train.{tgt_lang}"
+    # valid_src_file = dataset_path / f"valid.{src_lang}"
+    # valid_tgt_file = dataset_path / f"valid.{tgt_lang}"
+    # test_src_file = dataset_path / f"test.{src_lang}"
+    # test_tgt_file = dataset_path / f"test.{tgt_lang}"
+    train_src_file = dataset_path / f"train.14.{src_lang}"
+    train_tgt_file = dataset_path / f"train.14.{tgt_lang}"
+    valid_src_file = dataset_path / f"test.14.{src_lang}"
+    valid_tgt_file = dataset_path / f"test.14.{tgt_lang}"
+    test_src_file = dataset_path / f"test.14.{src_lang}"
+    test_tgt_file = dataset_path / f"test.14.{tgt_lang}"
 
     # 파일 존재 확인
     required_files = [
@@ -228,9 +280,20 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
     logger.info(f"  Test: {test_src_file.name}, {test_tgt_file.name}")
 
     # 어휘 사전 구축 (훈련 데이터에서)
-    vocab = SimpleVocabulary()
+    vocab = BPEVocabulary()
     vocab_files = [str(train_src_file), str(train_tgt_file)]
-    vocab.build_from_files(vocab_files, config.VOCAB_SIZE)
+
+    # BPE 모델 경로 설정
+    bpe_model_prefix = dataset_path / "bpe_model"
+    bpe_model_path = f"{bpe_model_prefix}.model"
+
+    # BPE 모델이 이미 존재하는지 확인
+    if os.path.exists(bpe_model_path):
+        logger.info(f"Loading existing BPE model: {bpe_model_path}")
+        vocab.load_model(bpe_model_path)
+    else:
+        logger.info("Training new BPE model...")
+        vocab.train_bpe_model(vocab_files, config.VOCAB_SIZE, str(bpe_model_prefix))
 
     # 데이터셋 생성
     train_dataset = RealWMTDataset(
