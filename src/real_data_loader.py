@@ -71,7 +71,8 @@ class BPEVocabulary:
             bos_piece="<BOS>",
             eos_piece="<EOS>",
             unk_piece="<UNK>",
-            user_defined_symbols=["<PAD>", "<BOS>", "<EOS>", "<UNK>"],
+            # <UNK>는 기본 제어 심볼이므로 user_defined_symbols에서 제외
+            user_defined_symbols=["<PAD>", "<BOS>", "<EOS>"],
         )
 
         # 임시 파일 삭제
