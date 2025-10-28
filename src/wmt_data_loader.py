@@ -10,6 +10,7 @@ from typing import List, Tuple, Dict, Optional, Union
 from torch.utils.data import Dataset, DataLoader
 from collections import Counter
 import logging
+import spacy
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,13 @@ class WMTDataset(Dataset):
         self.max_length = max_length
 
         # 데이터 로드
+
+        # self.spacy_src = spacy.load("en_core_web_sm")  # de
+        # self.spacy_tgt = spacy.load("de_core_news_sm")  # en
+
+        self.spacy_src = spacy.load("de_core_news_sm")
+        self.spacy_tgt = spacy.load("en_core_web_sm")
+
         self.src_sentences, self.tgt_sentences = self._load_data()
 
         logger.info(f"Loaded {len(self.src_sentences)} sentence pairs")
@@ -147,8 +155,10 @@ class WMTDataset(Dataset):
         ) as f_tgt:
 
             for line_num, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt)):
-                src_tokens = src_line.strip().split()
-                tgt_tokens = tgt_line.strip().split()
+                # src_tokens = src_line.strip().split()
+                # tgt_tokens = tgt_line.strip().split()
+                src_tokens = [token.text for token in self.spacy_src(src_line.strip())]
+                tgt_tokens = [token.text for token in self.spacy_tgt(tgt_line.strip())]
 
                 # 길이 제한 및 빈 라인 필터링
                 if (
