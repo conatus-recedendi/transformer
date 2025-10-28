@@ -52,6 +52,9 @@ class Config:
         # Evaluation parameters (matching evaluation section in JSON)
         self.EVAL_EVERY = 500
         self.SAVE_EVERY = 1000
+        self.N_CHECKPOINTS = (
+            5  # Number of checkpoints to average (5 for base, 20 for big model)
+        )
 
         # File paths (matching paths section in JSON)
         self.DATA_PATH = "data/"
@@ -63,7 +66,7 @@ class Config:
 
         # Update with any provided kwargs
         self.update(**kwargs)
-        
+
         # 초기화 후 적절한 배치 크기 계산 및 표시
         self._show_optimal_batch_size_recommendation()
 
@@ -128,6 +131,7 @@ class Config:
             "evaluation": {
                 "eval_every": self.EVAL_EVERY,
                 "save_every": self.SAVE_EVERY,
+                "n_checkpoints": self.N_CHECKPOINTS,
             },
             "paths": {
                 "data_path": self.DATA_PATH,
@@ -212,6 +216,7 @@ class Config:
             evaluation = json_data["evaluation"]
             config.EVAL_EVERY = evaluation.get("eval_every", config.EVAL_EVERY)
             config.SAVE_EVERY = evaluation.get("save_every", config.SAVE_EVERY)
+            config.N_CHECKPOINTS = evaluation.get("n_checkpoints", config.N_CHECKPOINTS)
 
         # Paths
         if "paths" in json_data:
@@ -226,37 +231,42 @@ class Config:
 
     def _show_optimal_batch_size_recommendation(self):
         """적절한 배치 크기 추천 계산 및 표시"""
-        
+
         # 데이터셋별 평균 시퀀스 길이 (실제 WMT 데이터 기준)
         dataset_avg_lengths = {
             "wmt14_en_de": 35,
-            "wmt14_en_fr": 40, 
+            "wmt14_en_fr": 40,
             "wmt14_cs_en": 32,
             "wmt16_en_de": 36,
             "opus": 30,
-            "dummy": 20
+            "dummy": 20,
         }
-        
+
         # 현재 데이터셋의 평균 길이 추정
         avg_seq_length = dataset_avg_lengths.get(self.DATASET, 35)
-        
+
         # 소스 + 타겟 시퀀스 길이 (대략 비슷함)
         total_avg_length = avg_seq_length * 2
-        
+
         # 최적 배치 크기 계산
         optimal_batch_size = self.TOKENS_PER_BATCH // total_avg_length
         optimal_batch_size = max(1, min(512, optimal_batch_size))
-        
+
         # 현재 배치 크기로 실제 토큰 수 계산
         current_tokens = self.BATCH_SIZE * total_avg_length
-        
+
         # 효율성 계산
-        efficiency = min(current_tokens / self.TOKENS_PER_BATCH, 
-                        self.TOKENS_PER_BATCH / current_tokens) * 100
-        
-        print("\n" + "="*60)
+        efficiency = (
+            min(
+                current_tokens / self.TOKENS_PER_BATCH,
+                self.TOKENS_PER_BATCH / current_tokens,
+            )
+            * 100
+        )
+
+        print("\n" + "=" * 60)
         print("📊 BATCH SIZE OPTIMIZATION ANALYSIS")
-        print("="*60)
+        print("=" * 60)
         print(f"📋 Dataset: {self.DATASET}")
         print(f"📏 Estimated avg sequence length: {avg_seq_length} tokens")
         print(f"🎯 Target tokens per batch: {self.TOKENS_PER_BATCH:,}")
@@ -264,30 +274,34 @@ class Config:
         print(f"  - Current batch size: {self.BATCH_SIZE}")
         print(f"  - Estimated tokens per batch: {current_tokens:,}")
         print(f"  - Token efficiency: {efficiency:.1f}%")
-        
+
         print("\n✨ Recommended Configuration:")
         print(f"  - Optimal batch size: {optimal_batch_size}")
-        print(f"  - Expected tokens per batch: {optimal_batch_size * total_avg_length:,}")
+        print(
+            f"  - Expected tokens per batch: {optimal_batch_size * total_avg_length:,}"
+        )
         print(f"  - Memory efficiency: ~100%")
-        
+
         # 메모리 및 성능 팁
         if current_tokens < self.TOKENS_PER_BATCH * 0.7:
             print("\n⚠️  Current batch size is TOO SMALL:")
             print(f"    - You're using only {efficiency:.1f}% of target capacity")
             print(f"    - Consider increasing batch_size to ~{optimal_batch_size}")
             print(f"    - This will improve GPU utilization and training speed")
-            
+
         elif current_tokens > self.TOKENS_PER_BATCH * 1.3:
             print("\n⚠️  Current batch size is TOO LARGE:")
-            print(f"    - You're using {current_tokens/self.TOKENS_PER_BATCH:.1f}x target capacity")
+            print(
+                f"    - You're using {current_tokens/self.TOKENS_PER_BATCH:.1f}x target capacity"
+            )
             print(f"    - Consider decreasing batch_size to ~{optimal_batch_size}")
             print(f"    - This will reduce memory usage and prevent OOM errors")
-            
+
         else:
             print("\n✅ Current batch size is reasonably optimal!")
             print(f"    - Token efficiency: {efficiency:.1f}%")
             print(f"    - Memory usage is well balanced")
-        
+
         # 다양한 시나리오 제시
         print(f"\n📋 Alternative Batch Sizes (for different sequence lengths):")
         scenarios = [20, 30, 40, 50, 60, 80]
@@ -296,42 +310,40 @@ class Config:
             batch_size = self.TOKENS_PER_BATCH // total_len
             batch_size = max(1, min(512, batch_size))
             tokens = batch_size * total_len
-            print(f"  - Avg seq {seq_len:2d} tokens → batch_size: {batch_size:3d} → {tokens:,} tokens")
-        
+            print(
+                f"  - Avg seq {seq_len:2d} tokens → batch_size: {batch_size:3d} → {tokens:,} tokens"
+            )
+
         print("\n💡 Tips:")
         print("  - Longer sequences = smaller batch sizes")
-        print("  - Shorter sequences = larger batch sizes") 
+        print("  - Shorter sequences = larger batch sizes")
         print("  - Adjust batch_size based on your actual data statistics")
         print("  - Monitor GPU memory usage during training")
-        print("="*60)
+        print("=" * 60)
 
     def calculate_optimal_batch_size(self, avg_seq_length: int = None) -> int:
         """평균 시퀀스 길이 기준으로 최적 배치 크기 계산"""
         if avg_seq_length is None:
             # 데이터셋별 기본값
-            dataset_avg_lengths = {
-                "wmt14_en_de": 35,
-                "wmt14_en_fr": 40,
-                "dummy": 20
-            }
+            dataset_avg_lengths = {"wmt14_en_de": 35, "wmt14_en_fr": 40, "dummy": 20}
             avg_seq_length = dataset_avg_lengths.get(self.DATASET, 35)
-        
+
         # 소스 + 타겟 고려
         total_avg_length = avg_seq_length * 2
-        
+
         # 배치 크기 계산
         optimal_batch_size = self.TOKENS_PER_BATCH // total_avg_length
         optimal_batch_size = max(1, min(512, optimal_batch_size))
-        
+
         return optimal_batch_size
-    
+
     def auto_adjust_batch_size(self, avg_seq_length: int = None) -> int:
         """배치 크기 자동 조정 (실제로 변경함)"""
         optimal_batch_size = self.calculate_optimal_batch_size(avg_seq_length)
-        
+
         print(f"🔧 Auto-adjusting batch size:")
         print(f"  - Old batch size: {self.BATCH_SIZE}")
         print(f"  - New batch size: {optimal_batch_size}")
-        
+
         self.BATCH_SIZE = optimal_batch_size
         return optimal_batch_size

@@ -280,7 +280,7 @@ class Trainer:
         return {"loss": avg_loss}
 
     def _save_checkpoint(self, is_best: bool = False):
-        """Save model checkpoint"""
+        """Save model checkpoint and manage checkpoint history"""
         checkpoint = {
             "epoch": self.current_epoch,
             "global_step": self.global_step,
@@ -303,6 +303,44 @@ class Trainer:
             self.logger.info(
                 f"New best model saved with validation loss: {self.best_val_loss:.4f}"
             )
+
+        # Manage checkpoint history - keep only last N checkpoints
+        self._cleanup_old_checkpoints()
+
+    def _cleanup_old_checkpoints(self):
+        """Keep only the last N checkpoints for model averaging"""
+        from pathlib import Path
+        import glob
+
+        checkpoint_dir = Path(self.config.MODEL_SAVE_PATH)
+        checkpoint_pattern = str(checkpoint_dir / "checkpoint_step_*.pt")
+        checkpoint_files = glob.glob(checkpoint_pattern)
+
+        if len(checkpoint_files) <= getattr(self.config, "N_CHECKPOINTS", 5):
+            return
+
+        # Extract step numbers and sort
+        def extract_step(path):
+            filename = os.path.basename(path)
+            try:
+                step = int(filename.split("_")[-1].split(".")[0])
+                return step
+            except (ValueError, IndexError):
+                return 0
+
+        checkpoint_files.sort(key=extract_step)
+
+        # Keep only last N checkpoints
+        n_checkpoints = getattr(self.config, "N_CHECKPOINTS", 5)
+        files_to_delete = checkpoint_files[:-n_checkpoints]
+
+        for file_path in files_to_delete:
+            try:
+                os.remove(file_path)
+                step = extract_step(file_path)
+                self.logger.debug(f"Removed old checkpoint: step_{step}.pt")
+            except OSError as e:
+                self.logger.warning(f"Failed to remove checkpoint {file_path}: {e}")
 
     def load_checkpoint(self, checkpoint_path: str):
         """Load model checkpoint"""
