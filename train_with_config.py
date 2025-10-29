@@ -5,6 +5,7 @@ Config-based training script for Transformer model
 import os
 import json
 import argparse
+import logging
 import torch
 from typing import Dict, Any
 from pathlib import Path
@@ -128,10 +129,11 @@ def load_config_from_json(config_path: str) -> Config:
 
 def load_data(config: Config, use_dummy: bool = True):
     """Load training, validation, and test data"""
+    logger = logging.getLogger(__name__)
 
     if use_dummy:
         # Use dummy data for testing
-        print("🔄 Loading dummy data...")
+        logger.info("🔄 Loading dummy data...")
         src_sequences, tgt_sequences = load_dummy_data(num_samples=10000)
 
         # Split data
@@ -199,14 +201,14 @@ def load_data(config: Config, use_dummy: bool = True):
             pad_token_id=config.PAD_TOKEN,
         )
 
-        print(f"Dataset sizes:")
-        print(f"  - Train: {len(train_dataset):,} samples")
-        print(f"  - Validation: {len(val_dataset):,} samples")
-        print(f"  - Test: {len(test_dataset):,} samples")
+        logger.info(f"Dataset sizes:")
+        logger.info(f"  - Train: {len(train_dataset):,} samples")
+        logger.info(f"  - Validation: {len(val_dataset):,} samples")
+        logger.info(f"  - Test: {len(test_dataset):,} samples")
 
     else:
         # 실제 WMT 데이터 로딩 (분리된 언어 파일 형식)
-        print("🔄 Loading real WMT dataset...")
+        logger.info("🔄 Loading real WMT dataset...")
 
         try:
             from src.real_data_loader import load_real_wmt_data
@@ -222,29 +224,32 @@ def load_data(config: Config, use_dummy: bool = True):
             train_loader, val_loader, test_loader = load_real_wmt_data(config)
 
             if train_loader is None:
-                print("❌ Failed to load real data. Check if data files exist:")
-                print(f"   Expected location: {config.DATA_PATH}{config.DATASET}/")
-                print(
+                logger.error("❌ Failed to load real data. Check if data files exist:")
+                logger.error(
+                    f"   Expected location: {config.DATA_PATH}{config.DATASET}/"
+                )
+                logger.error(
                     f"   Expected files: train.{config.SRC_LANG}, train.{config.TGT_LANG}, valid.{config.SRC_LANG}, valid.{config.TGT_LANG}, test.{config.SRC_LANG}, test.{config.TGT_LANG}"
                 )
-                print("   File format: each line should contain one sentence")
+                logger.error("   File format: each line should contain one sentence")
                 raise FileNotFoundError("Real data files not found")
 
         except (ImportError, FileNotFoundError) as e:
-            print(f"⚠️  Error loading real data: {e}")
-            print("   Falling back to dummy data...")
+            logger.warning(f"⚠️  Error loading real data: {e}")
+            logger.warning("   Falling back to dummy data...")
             return load_data(config, use_dummy=True)
 
-    print(f"Train batches: {len(train_loader)}")
-    print(f"Val batches: {len(val_loader)}")
-    print(f"Test batches: {len(test_loader)}")
+    logger.info(f"Train batches: {len(train_loader)}")
+    logger.info(f"Val batches: {len(val_loader)}")
+    logger.info(f"Test batches: {len(test_loader)}")
 
     return train_loader, val_loader, test_loader
 
 
 def create_model_from_config(config: Config) -> torch.nn.Module:
     """Create Transformer model from configuration"""
-    print("🤖 Creating Transformer model...")
+    logger = logging.getLogger(__name__)
+    logger.info("🤖 Creating Transformer model...")
 
     # 어휘 크기 결정
     if hasattr(config, "SRC_VOCAB_SIZE") and hasattr(config, "TGT_VOCAB_SIZE"):
@@ -295,14 +300,34 @@ def main():
         choices=["auto", "cpu", "cuda", "mps"],
         help="Device to use for training",
     )
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Logging level",
+    )
 
     args = parser.parse_args()
+
+    # Setup logging BEFORE importing modules that use logging
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(),  # Console output
+        ],
+    )
+
+    # Create logger for this module
+    logger = logging.getLogger(__name__)
+    logger.info("🚀 Starting Transformer training script...")
 
     # Check if config file exists
     if not os.path.exists(args.config):
         raise FileNotFoundError(f"Config file not found: {args.config}")
 
-    print(f"Loading configuration from: {args.config}")
+    logger.info(f"Loading configuration from: {args.config}")
 
     # Load configuration
     config = load_config_from_json(args.config)
@@ -317,71 +342,71 @@ def main():
     # Set random seed
     set_seed(args.seed)
 
-    print("\n" + "=" * 60)
-    print("TRANSFORMER TRAINING CONFIGURATION")
-    print("=" * 60)
+    logger.info("\n" + "=" * 60)
+    logger.info("TRANSFORMER TRAINING CONFIGURATION")
+    logger.info("=" * 60)
 
-    print("\nModel Configuration:")
-    print(f"  Model Dimension: {config.MODEL_DIM}")
-    print(f"  Number of Heads: {config.NUM_HEADS}")
-    print(f"  Encoder Layers: {config.NUM_ENCODER_LAYERS}")
-    print(f"  Decoder Layers: {config.NUM_DECODER_LAYERS}")
-    print(f"  FFN Dimension: {config.FFN_DIM}")
-    print(f"  Vocabulary Size: {config.VOCAB_SIZE}")
-    print(f"  Max Sequence Length: {config.MAX_SEQ_LENGTH}")
-    print(f"  Dropout: {config.DROPOUT}")
-    print(f"  Key Dimension (kdim): {config.KDIM}")
-    print(f"  Value Dimension (vdim): {config.VDIM}")
+    logger.info("\nModel Configuration:")
+    logger.info(f"  Model Dimension: {config.MODEL_DIM}")
+    logger.info(f"  Number of Heads: {config.NUM_HEADS}")
+    logger.info(f"  Encoder Layers: {config.NUM_ENCODER_LAYERS}")
+    logger.info(f"  Decoder Layers: {config.NUM_DECODER_LAYERS}")
+    logger.info(f"  FFN Dimension: {config.FFN_DIM}")
+    logger.info(f"  Vocabulary Size: {config.VOCAB_SIZE}")
+    logger.info(f"  Max Sequence Length: {config.MAX_SEQ_LENGTH}")
+    logger.info(f"  Dropout: {config.DROPOUT}")
+    logger.info(f"  Key Dimension (kdim): {config.KDIM}")
+    logger.info(f"  Value Dimension (vdim): {config.VDIM}")
 
-    print("\nTraining Configuration:")
-    print(f"  Batch Size: {config.BATCH_SIZE}")
-    print(f"  Learning Rate: {config.LEARNING_RATE}")
-    print(f"  Warmup Steps: {config.WARMUP_STEPS}")
-    print(f"  Max Epochs: {config.MAX_EPOCHS}")
-    print(f"  Gradient Clip: {config.GRADIENT_CLIP}")
+    logger.info("\nTraining Configuration:")
+    logger.info(f"  Batch Size: {config.BATCH_SIZE}")
+    logger.info(f"  Learning Rate: {config.LEARNING_RATE}")
+    logger.info(f"  Warmup Steps: {config.WARMUP_STEPS}")
+    logger.info(f"  Max Epochs: {config.MAX_EPOCHS}")
+    logger.info(f"  Gradient Clip: {config.GRADIENT_CLIP}")
 
-    print("\nData Configuration:")
-    print(f"  PAD Token: {config.PAD_TOKEN}")
-    print(f"  BOS Token: {config.BOS_TOKEN}")
-    print(f"  EOS Token: {config.EOS_TOKEN}")
-    print(f"  UNK Token: {config.UNK_TOKEN}")
+    logger.info("\nData Configuration:")
+    logger.info(f"  PAD Token: {config.PAD_TOKEN}")
+    logger.info(f"  BOS Token: {config.BOS_TOKEN}")
+    logger.info(f"  EOS Token: {config.EOS_TOKEN}")
+    logger.info(f"  UNK Token: {config.UNK_TOKEN}")
 
     # Display dataset-specific configuration if available
     if hasattr(config, "DATASET"):
-        print(f"\nDataset Configuration:")
-        print(f"  Dataset: {config.DATASET}")
+        logger.info(f"\nDataset Configuration:")
+        logger.info(f"  Dataset: {config.DATASET}")
 
         if hasattr(config, "SRC_VOCAB_SIZE") and hasattr(config, "TGT_VOCAB_SIZE"):
-            print(f"  Source Vocabulary Size: {config.SRC_VOCAB_SIZE:,}")
-            print(f"  Target Vocabulary Size: {config.TGT_VOCAB_SIZE:,}")
+            logger.info(f"  Source Vocabulary Size: {config.SRC_VOCAB_SIZE:,}")
+            logger.info(f"  Target Vocabulary Size: {config.TGT_VOCAB_SIZE:,}")
 
         if hasattr(config, "SHARED_VOCAB"):
-            print(f"  Shared Vocabulary: {config.SHARED_VOCAB}")
+            logger.info(f"  Shared Vocabulary: {config.SHARED_VOCAB}")
 
         if hasattr(config, "ENCODING"):
-            print(f"  Encoding: {config.ENCODING}")
+            logger.info(f"  Encoding: {config.ENCODING}")
 
         if hasattr(config, "TOKENS_PER_BATCH"):
-            print(f"  Tokens per Batch: {config.TOKENS_PER_BATCH:,}")
+            logger.info(f"  Tokens per Batch: {config.TOKENS_PER_BATCH:,}")
 
         if hasattr(config, "TRAIN_PAIRS") and hasattr(config, "VAL_PAIRS"):
-            print(f"  Training Pairs: {config.TRAIN_PAIRS:,}")
-            print(f"  Validation Pairs: {config.VAL_PAIRS:,}")
+            logger.info(f"  Training Pairs: {config.TRAIN_PAIRS:,}")
+            logger.info(f"  Validation Pairs: {config.VAL_PAIRS:,}")
 
         if hasattr(config, "SRC_LANG") and hasattr(config, "TGT_LANG"):
-            print(f"  Language Pair: {config.SRC_LANG} → {config.TGT_LANG}")
+            logger.info(f"  Language Pair: {config.SRC_LANG} → {config.TGT_LANG}")
 
-    print("\nEvaluation Configuration:")
-    print(f"  Eval Every: {config.EVAL_EVERY} steps")
-    print(f"  Save Every: {config.SAVE_EVERY} steps")
+    logger.info("\nEvaluation Configuration:")
+    logger.info(f"  Eval Every: {config.EVAL_EVERY} steps")
+    logger.info(f"  Save Every: {config.SAVE_EVERY} steps")
 
-    print(f"\nDevice: {config.DEVICE}")
-    print(f"Random Seed: {args.seed}")
+    logger.info(f"\nDevice: {config.DEVICE}")
+    logger.info(f"Random Seed: {args.seed}")
 
     # Print estimated model information
     config.print_estimated_model_info()
 
-    print("=" * 60)
+    logger.info("=" * 60)
 
     # Load data
     train_loader, val_loader, test_loader = load_data(
@@ -389,14 +414,14 @@ def main():
     )
 
     # Create model
-    print("\n🤖 Creating Transformer model...")
+    logger.info("\n🤖 Creating Transformer model...")
     model = create_model_from_config(config)
 
     # Print detailed model summary with parameter information
     print_model_summary(model)
 
     # Create trainer
-    print("\n🏋️ Creating trainer...")
+    logger.info("\n🏋️ Creating trainer...")
     trainer = create_trainer(
         model=model,
         config=config,
@@ -405,22 +430,25 @@ def main():
         test_loader=test_loader,
     )
 
-    print(f"Trainer created successfully!")
-    print(f"  - Optimizer: Adam (betas=(0.9, 0.98), eps=1e-9)")
-    print(f"  - Scheduler: Warmup + Decay")
-    print(f"  - Loss Function: CrossEntropyLoss (ignore_index={config.PAD_TOKEN})")
+    logger.info(f"Trainer created successfully!")
+    logger.info(f"  - Optimizer: Adam (betas=(0.9, 0.98), eps=1e-9)")
+    logger.info(f"  - Scheduler: Warmup + Decay")
+    logger.info(
+        f"  - Loss Function: CrossEntropyLoss (ignore_index={config.PAD_TOKEN})"
+    )
 
     # Start training
-    print("\n🚀 Starting training...")
+    logger.info("\n🚀 Starting training...")
     trainer.train()
 
     # Run final test
-    print("\n🧪 Running final test...")
+    logger.info("\n🧪 Running final test...")
     test_results = trainer.test()
-    print(f"Final test results: {test_results}")
+    logger.info(f"Final test results: {test_results}")
 
-    print("\n✅ Training completed!")
+    logger.info("\n✅ Training completed!")
 
 
 if __name__ == "__main__":
     main()
+    logging.basicConfig(filename="run.log")
