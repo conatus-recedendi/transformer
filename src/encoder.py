@@ -134,8 +134,8 @@ class Encoder(nn.Module):
         nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
 
         # Initialize final layer norm
-        nn.init.uniform_(self.norm.weight, -0.1, 0.1)
-        nn.init.uniform_(self.norm.bias, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.weight, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.bias, -0.1, 0.1)
 
         print(f"Encoder: Initialized all parameters with U[-0.1, 0.1]")
 
