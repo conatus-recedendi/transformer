@@ -386,11 +386,14 @@ class Config:
         tgt_embedding_params = tgt_vocab_size * d_model
         positional_embedding_params = self.MAX_SEQ_LENGTH * d_model
 
-        # 어텐션 레이어 파라미터 (per layer)
-        # Q, K, V projections + output projection
-        # Q: d_model -> kdim, K: d_model -> kdim, V: d_model -> vdim, Output: vdim -> d_model
+        # 어텐션 레이어 파라미터 (per layer) - 실제 구현에 맞게 수정
+        # 실제로는 Q, K: d_model -> d_model, V: d_model -> d_model, Output: d_model -> d_model
+        # MultiHeadAttention에서 실제로는 모든 projection이 d_model -> d_model 차원임
         attention_params_per_layer = (
-            (d_model * kdim) + (d_model * kdim) + (d_model * vdim) + (vdim * d_model)
+            (d_model * d_model)
+            + (d_model * d_model)
+            + (d_model * d_model)
+            + (d_model * d_model)
         )
 
         # Feed-forward 레이어 파라미터 (per layer)

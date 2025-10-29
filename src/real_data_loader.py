@@ -63,16 +63,20 @@ class BPEVocabulary:
             vocab_size=vocab_size,
             character_coverage=0.995,
             model_type="bpe",
-            pad_id=self.special_tokens["<PAD>"],
-            bos_id=self.special_tokens["<BOS>"],
-            eos_id=self.special_tokens["<EOS>"],
-            unk_id=self.special_tokens["<UNK>"],
+            # 특수 토큰 ID를 명확히 분리하여 설정
+            pad_id=0,
+            bos_id=1,
+            eos_id=2,
+            unk_id=3,
+            # 특수 토큰 문자열 설정
             pad_piece="<PAD>",
             bos_piece="<BOS>",
             eos_piece="<EOS>",
             unk_piece="<UNK>",
-            # <UNK>는 기본 제어 심볼이므로 user_defined_symbols에서 제외
-            user_defined_symbols=["<PAD>", "<BOS>", "<EOS>"],
+            # user_defined_symbols에서 UNK 제외 (자동으로 정의됨)
+            user_defined_symbols=[],
+            # 추가 설정으로 정확한 ID 매핑 보장
+            control_symbols=["<PAD>", "<BOS>", "<EOS>"],
         )
 
         # 임시 파일 삭제
@@ -84,12 +88,60 @@ class BPEVocabulary:
         logger.info(f"BPE model trained and saved: {self.model_path}")
         logger.info(f"Vocabulary size: {len(self)}")
 
+        # 훈련 직후 특수 토큰 검증
+        logger.info("Verifying special tokens after training:")
+        for token, expected_id in self.special_tokens.items():
+            actual_id = self.sp_model.piece_to_id(token)
+            if actual_id == expected_id:
+                logger.info(f"  ✓ {token}: {actual_id}")
+            else:
+                logger.error(f"  ✗ {token}: expected {expected_id}, got {actual_id}")
+                raise ValueError(
+                    f"BPE training failed: {token} has wrong ID {actual_id}, expected {expected_id}"
+                )
+
     def load_model(self, model_path: str):
         """훈련된 BPE 모델 로드"""
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.load(model_path)
         self.model_path = model_path
+
+        # 특수 토큰 ID 검증 및 수정
+        self._verify_special_tokens()
+
         logger.info(f"BPE model loaded from {model_path}")
+        logger.info(f"Vocabulary size: {len(self)}")
+        logger.info(f"Special token mapping:")
+        for token, expected_id in self.special_tokens.items():
+            actual_id = self.sp_model.piece_to_id(token)
+            logger.info(f"  {token}: expected={expected_id}, actual={actual_id}")
+
+    def _verify_special_tokens(self):
+        """특수 토큰 ID가 올바르게 설정되었는지 검증"""
+        for token, expected_id in self.special_tokens.items():
+            actual_id = self.sp_model.piece_to_id(token)
+            if actual_id != expected_id:
+                logger.warning(
+                    f"Special token ID mismatch: {token} expected={expected_id}, actual={actual_id}"
+                )
+
+        # 어휘 크기 확인
+        vocab_size = self.sp_model.get_piece_size()
+        logger.info(f"Loaded vocabulary size: {vocab_size}")
+
+        # 처음 몇 개 토큰 확인
+        logger.info("First 10 tokens:")
+        for i in range(min(10, vocab_size)):
+            piece = self.sp_model.id_to_piece(i)
+            logger.info(f"  ID {i}: '{piece}'")
+
+        # 특수 토큰이 제대로 설정되었는지 다시 확인
+        for token in ["<PAD>", "<BOS>", "<EOS>", "<UNK>"]:
+            token_id = self.sp_model.piece_to_id(token)
+            if token_id < 0:
+                logger.error(f"Invalid token ID for {token}: {token_id}")
+            else:
+                logger.info(f"Valid token: {token} -> ID {token_id}")
 
     def encode(self, text: str) -> List[int]:
         """텍스트를 BPE 토큰 ID로 변환"""
@@ -290,8 +342,37 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
 
     # BPE 모델이 이미 존재하는지 확인
     if os.path.exists(bpe_model_path):
-        logger.info(f"Loading existing BPE model: {bpe_model_path}")
+        logger.info(f"Found existing BPE model: {bpe_model_path}")
         vocab.load_model(bpe_model_path)
+
+        # 특수 토큰이 올바르게 설정되었는지 확인
+        pad_id = vocab.sp_model.piece_to_id("<PAD>")
+        bos_id = vocab.sp_model.piece_to_id("<BOS>")
+        eos_id = vocab.sp_model.piece_to_id("<EOS>")
+        unk_id = vocab.sp_model.piece_to_id("<UNK>")
+
+        # 특수 토큰 ID가 잘못되었으면 재훈련
+        if (
+            pad_id != 0
+            or bos_id != 1
+            or eos_id != 2
+            or unk_id != 3
+            or any(id < 0 for id in [pad_id, bos_id, eos_id, unk_id])
+        ):
+            logger.warning(
+                "Special tokens are incorrectly configured. Retraining BPE model..."
+            )
+            # 기존 모델 파일들 삭제
+            for ext in [".model", ".vocab"]:
+                old_file = f"{bpe_model_prefix}{ext}"
+                if os.path.exists(old_file):
+                    os.remove(old_file)
+                    logger.info(f"Removed corrupted BPE file: {old_file}")
+
+            # 새로 훈련
+            vocab.train_bpe_model(vocab_files, config.VOCAB_SIZE, str(bpe_model_prefix))
+        else:
+            logger.info("BPE model special tokens are correctly configured.")
     else:
         logger.info("Training new BPE model...")
         vocab.train_bpe_model(vocab_files, config.VOCAB_SIZE, str(bpe_model_prefix))

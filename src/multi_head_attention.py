@@ -32,11 +32,11 @@ class MultiheadAttention(nn.Module):
         # Head dimension
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
         self.head_dim = embed_dim // num_heads
-        q_k_embed_dim = self.kdim * num_heads
+        self.q_k_embed_dim = self.kdim * num_heads
 
         # Linear projections for Q, K, V (all heads combined)
-        self.q_linear = nn.Linear(q_k_embed_dim, q_k_embed_dim, bias=bias)
-        self.k_linear = nn.Linear(q_k_embed_dim, q_k_embed_dim, bias=bias)
+        self.q_linear = nn.Linear(self.q_k_embed_dim, self.q_k_embed_dim, bias=bias)
+        self.k_linear = nn.Linear(self.q_k_embed_dim, self.q_k_embed_dim, bias=bias)
         self.v_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
 
         # Output projection
