@@ -27,6 +27,7 @@ class MultiheadAttention(nn.Module):
         self.kdim = kdim if kdim is not None else embed_dim
         self.vdim = vdim if vdim is not None else embed_dim
         self.batch_first = batch_first
+        self.embed_dim = embed_dim
 
         # Head dimension
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
