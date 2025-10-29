@@ -438,7 +438,7 @@ class Config:
         """추정된 모델 정보 출력"""
         estimated_params = self.estimate_model_parameters()
 
-        print(f"\n🔮 Estimated Model Information:")
+        print(f"\n🔮 Estimated Model Information by config:")
         print(f"  Estimated parameters: {estimated_params:,}")
         print(
             f"  Estimated model size: {estimated_params * 4 / (1024**2):.1f} MB (float32)"

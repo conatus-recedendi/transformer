@@ -39,7 +39,7 @@ class MultiheadAttention(nn.Module):
         self.v_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
 
         # Output projection
-        self.out_linear = nn.Linear(self.vdim, self.vdim, bias=bias)
+        self.out_linear = nn.Linear(self.embed_dim, self.embed_dim, bias=bias)
 
         # Dropout layer
         self.dropout_layer = nn.Dropout(dropout)
