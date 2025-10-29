@@ -144,21 +144,144 @@ def count_parameters(model: nn.Module) -> int:
 
 def print_model_summary(model: nn.Module):
     """
-    Print model summary
+    Print detailed model summary with parameter breakdown
 
     Args:
         model: PyTorch model
     """
-    print("=" * 60)
-    print("MODEL SUMMARY")
-    print("=" * 60)
+    print("\n" + "=" * 80)
+    print("📊 DETAILED MODEL SUMMARY")
+    print("=" * 80)
 
+    # Count total parameters
     total_params = count_parameters(model)
-    print(f"Total trainable parameters: {total_params:,}")
+    total_params_all = sum(p.numel() for p in model.parameters())
 
-    print("\nModel architecture:")
-    print(model)
-    print("=" * 60)
+    print(f"🔢 Total trainable parameters: {total_params:,}")
+    print(f"🔢 Total parameters (including non-trainable): {total_params_all:,}")
+
+    # Calculate model size in MB
+    param_size_mb = total_params * 4 / (1024 * 1024)  # Assuming float32
+    print(f"💾 Model size (float32): {param_size_mb:.2f} MB")
+
+    # Parameter breakdown by component
+    print(f"\n📋 Parameter Breakdown by Component:")
+    print("-" * 50)
+
+    component_params = {}
+
+    for name, module in model.named_modules():
+        if len(list(module.children())) == 0:  # Leaf modules only
+            params = sum(p.numel() for p in module.parameters())
+            if params > 0:
+                # Categorize parameters
+                if "encoder" in name:
+                    category = "Encoder"
+                elif "decoder" in name:
+                    category = "Decoder"
+                elif "embedding" in name or "embed" in name:
+                    category = "Embeddings"
+                elif "output_projection" in name or "projection" in name:
+                    category = "Output Projection"
+                elif "attention" in name or "attn" in name:
+                    category = "Attention"
+                elif "feed_forward" in name or "ffn" in name or "mlp" in name:
+                    category = "Feed Forward"
+                elif "norm" in name or "layer_norm" in name:
+                    category = "Layer Norm"
+                else:
+                    category = "Other"
+
+                if category not in component_params:
+                    component_params[category] = 0
+                component_params[category] += params
+
+    # Sort by parameter count
+    sorted_components = sorted(
+        component_params.items(), key=lambda x: x[1], reverse=True
+    )
+
+    for component, params in sorted_components:
+        percentage = (params / total_params) * 100
+        print(f"  {component:.<25} {params:>12,} ({percentage:5.1f}%)")
+
+    # Memory usage estimation
+    print(f"\n💾 Memory Usage Estimation (Training):")
+    print("-" * 50)
+
+    # Forward pass memory (activations)
+    # Rough estimation based on model size and sequence length
+    seq_len = getattr(model, "d_model", 512)  # Use d_model as rough seq_len estimate
+    d_model = getattr(model, "d_model", 512)
+    batch_size = 32  # Assumption
+
+    activation_memory_mb = (batch_size * seq_len * d_model * 4) / (1024 * 1024)
+    gradient_memory_mb = param_size_mb  # Gradients same size as parameters
+    optimizer_memory_mb = param_size_mb * 2  # Adam uses 2x parameter memory
+
+    total_memory_mb = (
+        param_size_mb + activation_memory_mb + gradient_memory_mb + optimizer_memory_mb
+    )
+
+    print(f"  Parameters:............ {param_size_mb:8.2f} MB")
+    print(f"  Activations (est):...... {activation_memory_mb:8.2f} MB")
+    print(f"  Gradients:.............. {gradient_memory_mb:8.2f} MB")
+    print(f"  Optimizer state:........ {optimizer_memory_mb:8.2f} MB")
+    print(f"  {'Total (estimated):':.<24} {total_memory_mb:8.2f} MB")
+
+    # Model architecture comparison
+    print(f"\n🏗️  Architecture Comparison:")
+    print("-" * 50)
+
+    # Try to extract key architectural info
+    if hasattr(model, "encoder") and hasattr(model.encoder, "layers"):
+        num_encoder_layers = (
+            len(model.encoder.layers)
+            if hasattr(model.encoder.layers, "__len__")
+            else "Unknown"
+        )
+        print(f"  Encoder layers:......... {num_encoder_layers}")
+
+    if hasattr(model, "decoder") and hasattr(model.decoder, "layers"):
+        num_decoder_layers = (
+            len(model.decoder.layers)
+            if hasattr(model.decoder.layers, "__len__")
+            else "Unknown"
+        )
+        print(f"  Decoder layers:......... {num_decoder_layers}")
+
+    if hasattr(model, "d_model"):
+        print(f"  Model dimension:........ {model.d_model}")
+
+    # Compare with known models
+    print(f"\n📈 Model Scale Comparison:")
+    print("-" * 50)
+
+    if total_params < 10_000_000:
+        scale = "Small (< 10M)"
+    elif total_params < 100_000_000:
+        scale = "Medium (10M - 100M)"
+    elif total_params < 1_000_000_000:
+        scale = "Large (100M - 1B)"
+    else:
+        scale = "Very Large (> 1B)"
+
+    print(f"  Model scale:............ {scale}")
+
+    # Reference models for comparison
+    reference_models = {
+        "Transformer Base": "65M parameters",
+        "Transformer Big": "213M parameters",
+        "GPT-2 Small": "117M parameters",
+        "BERT Base": "110M parameters",
+        "T5 Small": "60M parameters",
+    }
+
+    print(f"  Reference models:")
+    for model_name, params in reference_models.items():
+        print(f"    {model_name}:...... {params}")
+
+    print("=" * 80)
 
 
 def save_config(config: Dict[str, Any], filepath: str):

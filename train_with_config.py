@@ -372,6 +372,9 @@ def main():
     print(f"\nDevice: {config.DEVICE}")
     print(f"Random Seed: {args.seed}")
 
+    # Print estimated model information
+    config.print_estimated_model_info()
+
     print("=" * 60)
 
     # Load data
@@ -380,7 +383,10 @@ def main():
     )
 
     # Create model
+    print("\n🤖 Creating Transformer model...")
     model = create_model_from_config(config)
+
+    # Print detailed model summary with parameter information
     print_model_summary(model)
 
     # Create trainer

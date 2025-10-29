@@ -355,3 +355,92 @@ class Config:
 
         self.BATCH_SIZE = optimal_batch_size
         return optimal_batch_size
+
+    def estimate_model_parameters(self) -> int:
+        """모델 파라미터 수 추정"""
+
+        # 어휘 크기 결정
+        if hasattr(self, "SRC_VOCAB_SIZE") and hasattr(self, "TGT_VOCAB_SIZE"):
+            src_vocab_size = self.SRC_VOCAB_SIZE
+            tgt_vocab_size = self.TGT_VOCAB_SIZE
+        else:
+            src_vocab_size = self.VOCAB_SIZE
+            tgt_vocab_size = self.VOCAB_SIZE
+
+        d_model = self.MODEL_DIM
+        num_heads = self.NUM_HEADS
+        num_encoder_layers = self.NUM_ENCODER_LAYERS
+        num_decoder_layers = self.NUM_DECODER_LAYERS
+        d_ff = self.FFN_DIM
+
+        # 임베딩 레이어 파라미터
+        src_embedding_params = src_vocab_size * d_model
+        tgt_embedding_params = tgt_vocab_size * d_model
+        positional_embedding_params = self.MAX_SEQ_LENGTH * d_model
+
+        # 어텐션 레이어 파라미터 (per layer)
+        # Q, K, V projections + output projection
+        attention_params_per_layer = 4 * (d_model * d_model)
+
+        # Feed-forward 레이어 파라미터 (per layer)
+        # Two linear layers
+        ff_params_per_layer = d_model * d_ff + d_ff * d_model
+
+        # Layer norm 파라미터 (per layer)
+        # 2 layer norms per encoder layer, 3 per decoder layer
+        encoder_ln_params_per_layer = 2 * d_model * 2  # weight + bias
+        decoder_ln_params_per_layer = 3 * d_model * 2  # weight + bias
+
+        # 총 파라미터 계산
+        embedding_params = (
+            src_embedding_params + tgt_embedding_params + positional_embedding_params
+        )
+
+        encoder_params = num_encoder_layers * (
+            attention_params_per_layer
+            + ff_params_per_layer
+            + encoder_ln_params_per_layer
+        )
+
+        decoder_params = num_decoder_layers * (
+            2 * attention_params_per_layer
+            + ff_params_per_layer
+            + decoder_ln_params_per_layer  # 2x attention (self + cross)
+        )
+
+        # Output projection (종종 tgt embedding과 weight sharing)
+        if getattr(self, "tie_weights", True):
+            output_projection_params = 0  # Shared with tgt embedding
+        else:
+            output_projection_params = d_model * tgt_vocab_size
+
+        total_params = (
+            embedding_params
+            + encoder_params
+            + decoder_params
+            + output_projection_params
+        )
+
+        return total_params
+
+    def print_estimated_model_info(self):
+        """추정된 모델 정보 출력"""
+        estimated_params = self.estimate_model_parameters()
+
+        print(f"\n🔮 Estimated Model Information:")
+        print(f"  Estimated parameters: {estimated_params:,}")
+        print(
+            f"  Estimated model size: {estimated_params * 4 / (1024**2):.1f} MB (float32)"
+        )
+
+        # 스케일 분류
+        if estimated_params < 10_000_000:
+            scale = "Small (< 10M)"
+        elif estimated_params < 100_000_000:
+            scale = "Medium (10M - 100M)"
+        elif estimated_params < 1_000_000_000:
+            scale = "Large (100M - 1B)"
+        else:
+            scale = "Very Large (> 1B)"
+
+        print(f"  Model scale: {scale}")

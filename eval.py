@@ -506,7 +506,7 @@ class ModelEvaluator:
 
                     except Exception as e:
                         self.logger.warning(f"Error in vocabulary decoding: {e}")
-                        pred_words = ["<UNK>"]
+                        pred_words = [">"]
                         ref_words = ["<UNK>"]
 
                     # Debug: log final words
