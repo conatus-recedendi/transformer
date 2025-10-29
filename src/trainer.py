@@ -178,6 +178,10 @@ class Trainer:
         src = batch["src"]  # [batch_size, src_len]
         tgt = batch["tgt"]  # [batch_size, tgt_len]
 
+        # 🔍 매 배치마다 첫 번째 샘플 데이터 보여주기
+        if self.global_step % 1 == 0:  # 매 배치마다
+            self._debug_batch_sample(src, tgt, batch_idx=self.global_step)
+
         # Create input and target for decoder
         tgt_input = tgt[:, :-1]  # [batch_size, tgt_len-1] - remove last token
         tgt_output = tgt[
@@ -193,6 +197,104 @@ class Trainer:
 
         loss = self.criterion(logits_flat, tgt_flat)
         return loss
+
+    def _debug_batch_sample(self, src, tgt, batch_idx):
+        """매 배치마다 첫 번째 샘플의 상세한 데이터 분석"""
+        if batch_idx > 10:  # 처음 10배치만
+            return
+
+        # 첫 번째 샘플 가져오기
+        src_sample = src[0]  # [src_len]
+        tgt_sample = tgt[0]  # [tgt_len]
+
+        self.logger.info(f"\n{'='*60}")
+        self.logger.info(f"🔍 BATCH {batch_idx} - SAMPLE DEBUG")
+        self.logger.info(f"{'='*60}")
+
+        # 기본 정보
+        self.logger.info(f"📊 Batch shape - src: {src.shape}, tgt: {tgt.shape}")
+        self.logger.info(
+            f"📊 Sample shape - src: {src_sample.shape}, tgt: {tgt_sample.shape}"
+        )
+
+        # 특수 토큰 정보
+        self.logger.info(
+            f"🏷️  Special tokens: PAD={self.config.PAD_TOKEN}, BOS={self.config.BOS_TOKEN}, EOS={self.config.EOS_TOKEN}, UNK={self.config.UNK_TOKEN}"
+        )
+
+        # Source 분석
+        src_list = src_sample.tolist()
+        src_nonpad = [x for x in src_list if x != self.config.PAD_TOKEN]
+        self.logger.info(f"🔤 Source (길이 {len(src_list)}):")
+        self.logger.info(
+            f"   전체: {src_list[:20]}{'...' if len(src_list) > 20 else ''}"
+        )
+        self.logger.info(
+            f"   PAD 제외: {src_nonpad[:15]}{'...' if len(src_nonpad) > 15 else ''}"
+        )
+
+        # Target 분석
+        tgt_list = tgt_sample.tolist()
+        tgt_nonpad = [x for x in tgt_list if x != self.config.PAD_TOKEN]
+        self.logger.info(f"🎯 Target (길이 {len(tgt_list)}):")
+        self.logger.info(
+            f"   전체: {tgt_list[:20]}{'...' if len(tgt_list) > 20 else ''}"
+        )
+        self.logger.info(
+            f"   PAD 제외: {tgt_nonpad[:15]}{'...' if len(tgt_nonpad) > 15 else ''}"
+        )
+
+        # 특수 토큰 존재 확인
+        has_bos = self.config.BOS_TOKEN in tgt_list
+        has_eos = self.config.EOS_TOKEN in tgt_list
+        bos_pos = tgt_list.index(self.config.BOS_TOKEN) if has_bos else -1
+        eos_pos = tgt_list.index(self.config.EOS_TOKEN) if has_eos else -1
+
+        self.logger.info(f"🔍 Target 특수 토큰:")
+        self.logger.info(f"   BOS 존재: {has_bos} (위치: {bos_pos})")
+        self.logger.info(f"   EOS 존재: {has_eos} (위치: {eos_pos})")
+        self.logger.info(f"   첫 토큰: {tgt_list[0] if len(tgt_list) > 0 else 'N/A'}")
+        self.logger.info(
+            f"   마지막 토큰: {tgt_list[-1] if len(tgt_list) > 0 else 'N/A'}"
+        )
+
+        # Teacher Forcing 처리 결과
+        if len(tgt_list) > 1:
+            tgt_input = tgt_sample[:-1].tolist()  # BOS 포함, EOS 제외
+            tgt_output = tgt_sample[1:].tolist()  # BOS 제외, EOS 포함
+
+            self.logger.info(f"📚 Teacher Forcing 처리:")
+            self.logger.info(
+                f"   입력 (decoder input): {tgt_input[:15]}{'...' if len(tgt_input) > 15 else ''}"
+            )
+            self.logger.info(
+                f"   출력 (target output): {tgt_output[:15]}{'...' if len(tgt_output) > 15 else ''}"
+            )
+            self.logger.info(
+                f"   입력 길이: {len(tgt_input)}, 출력 길이: {len(tgt_output)}"
+            )
+
+            # 토큰 매핑 예시 (처음 5개)
+            self.logger.info(f"📝 토큰 매핑 예시:")
+            for i in range(min(5, len(tgt_input))):
+                self.logger.info(
+                    f"   입력[{i}]={tgt_input[i]} → 예측해야할값={tgt_output[i]}"
+                )
+        else:
+            self.logger.info(f"⚠️  Target 시퀀스가 너무 짧음 (길이: {len(tgt_list)})")
+
+        # PAD 토큰 통계
+        src_pad_count = (src_sample == self.config.PAD_TOKEN).sum().item()
+        tgt_pad_count = (tgt_sample == self.config.PAD_TOKEN).sum().item()
+        self.logger.info(f"📊 PAD 토큰 통계:")
+        self.logger.info(
+            f"   Source PAD: {src_pad_count}/{src_sample.size(0)} ({src_pad_count/src_sample.size(0)*100:.1f}%)"
+        )
+        self.logger.info(
+            f"   Target PAD: {tgt_pad_count}/{tgt_sample.size(0)} ({tgt_pad_count/tgt_sample.size(0)*100:.1f}%)"
+        )
+
+        self.logger.info(f"{'='*60}\n")
 
     def validate(self) -> Dict[str, float]:
         """Validate the model"""
