@@ -99,6 +99,8 @@ def test_full_encoder():
     d_ff = 2048
     max_seq_length = 5000
     dropout = 0.1
+    kdim = 64
+    vdim = 64
 
     # Create encoder
     encoder = Encoder(
@@ -109,6 +111,8 @@ def test_full_encoder():
         d_ff=d_ff,
         max_seq_length=max_seq_length,
         dropout=dropout,
+        kdim=kdim,
+        vdim=vdim,
     )
 
     print(f"Encoder parameters:")
@@ -181,7 +185,9 @@ def test_different_configurations():
     for i, config in enumerate(configurations):
         print(f"\nConfiguration {i+1}: {config}")
 
-        encoder = Encoder(vocab_size=5000, **config, max_seq_length=512, dropout=0.1)
+        encoder = Encoder(
+            vocab_size=5000, **config, max_seq_length=512, dropout=0.1, kdim=64, vdim=64
+        )
 
         # Test with small input
         batch_size = 1

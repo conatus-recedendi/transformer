@@ -110,6 +110,8 @@ def test_full_decoder():
     d_ff = 2048
     max_seq_length = 5000
     dropout = 0.1
+    kdim = 64
+    vdim = 64
 
     # Create decoder
     decoder = Decoder(
@@ -120,6 +122,8 @@ def test_full_decoder():
         d_ff=d_ff,
         max_seq_length=max_seq_length,
         dropout=dropout,
+        kdim=kdim,
+        vdim=vdim,
     )
 
     print(f"Decoder parameters:")
@@ -203,6 +207,8 @@ def test_encoder_decoder_integration():
     num_layers = 3
     d_ff = 1024
     dropout = 0.1
+    kdim = 64
+    vdim = 64
 
     src_vocab_size = 5000
     tgt_vocab_size = 6000
@@ -215,6 +221,8 @@ def test_encoder_decoder_integration():
         num_layers=num_layers,
         d_ff=d_ff,
         dropout=dropout,
+        kdim=kdim,
+        vdim=vdim,
     )
 
     decoder = Decoder(
@@ -224,6 +232,8 @@ def test_encoder_decoder_integration():
         num_layers=num_layers,
         d_ff=d_ff,
         dropout=dropout,
+        kdim=kdim,
+        vdim=vdim,
     )
 
     print(f"Encoder-Decoder configuration:")

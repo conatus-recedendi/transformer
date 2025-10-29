@@ -82,7 +82,12 @@ def test_multihead_attention():
 
     # Test batch_first=False
     attention_seq_first = MultiheadAttention(
-        embed_dim=embed_dim, num_heads=num_heads, dropout=0.1, batch_first=False
+        embed_dim=embed_dim,
+        num_heads=num_heads,
+        dropout=0.1,
+        batch_first=False,
+        kdim=64,
+        vdim=64,
     )
 
     # Transpose inputs for seq_first format
@@ -119,9 +124,16 @@ def test_self_attention():
     seq_len = 8
     embed_dim = 256
     num_heads = 4
+    kdim = 64
+    vdim = 64
 
     attention = MultiheadAttention(
-        embed_dim=embed_dim, num_heads=num_heads, dropout=0.0, batch_first=True
+        embed_dim=embed_dim,
+        num_heads=num_heads,
+        dropout=0.0,
+        batch_first=True,
+        kdim=kdim,
+        vdim=vdim,
     )
 
     # Self-attention: query, key, value are the same

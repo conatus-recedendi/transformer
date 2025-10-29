@@ -21,6 +21,8 @@ class Transformer(nn.Module):
         dropout=0.1,
         pad_token_id=0,
         tie_weights=True,
+        kdim=64,
+        vdim=64,
     ):
         """
         Args:
@@ -35,6 +37,8 @@ class Transformer(nn.Module):
             dropout: Dropout probability
             pad_token_id: Padding token ID
             tie_weights: Whether to tie decoder embedding and output projection weights
+            kdim: Dimension of key vectors
+            vdim: Dimension of value vectors
         """
         super(Transformer, self).__init__()
 
@@ -52,6 +56,8 @@ class Transformer(nn.Module):
             max_seq_length=max_seq_length,
             dropout=dropout,
             padding_idx=pad_token_id,
+            kdim=kdim,
+            vdim=vdim,
         )
 
         # Decoder
@@ -64,6 +70,8 @@ class Transformer(nn.Module):
             max_seq_length=max_seq_length,
             dropout=dropout,
             padding_idx=pad_token_id,
+            kdim=kdim,
+            vdim=vdim,
         )
 
         # Output projection layer

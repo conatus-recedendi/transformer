@@ -41,6 +41,8 @@ def load_config_from_json(config_path: str) -> Config:
                 "FFN_DIM": model.get("ffn_dim", 2048),
                 "DROPOUT": model.get("dropout", 0.1),
                 "MAX_SEQ_LENGTH": model.get("max_seq_length", 512),
+                "KDIM": model.get("kdim", 64),
+                "VDIM": model.get("vdim", 64),
             }
         )
 
@@ -264,6 +266,8 @@ def create_model_from_config(config: Config) -> torch.nn.Module:
         dropout=config.DROPOUT,
         pad_token_id=config.PAD_TOKEN,
         tie_weights=True,  # Tie embedding and output projection weights
+        kdim=config.KDIM,
+        vdim=config.VDIM,
     )
 
     return model
@@ -326,6 +330,8 @@ def main():
     print(f"  Vocabulary Size: {config.VOCAB_SIZE}")
     print(f"  Max Sequence Length: {config.MAX_SEQ_LENGTH}")
     print(f"  Dropout: {config.DROPOUT}")
+    print(f"  Key Dimension (kdim): {config.KDIM}")
+    print(f"  Value Dimension (vdim): {config.VDIM}")
 
     print("\nTraining Configuration:")
     print(f"  Batch Size: {config.BATCH_SIZE}")

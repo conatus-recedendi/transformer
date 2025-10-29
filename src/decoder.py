@@ -8,17 +8,27 @@ from .encoder import PositionalEncoding
 class DecoderLayer(nn.Module):
     """Single Transformer Decoder Layer"""
 
-    def __init__(self, d_model, num_heads, d_ff, dropout=0.1):
+    def __init__(self, d_model, num_heads, d_ff, dropout=0.1, kdim=64, vdim=64):
         super(DecoderLayer, self).__init__()
 
         # Masked multi-head self-attention
         self.masked_self_attn = MultiheadAttention(
-            embed_dim=d_model, num_heads=num_heads, dropout=dropout, batch_first=True
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+            kdim=kdim,
+            vdim=vdim,
         )
 
         # Multi-head cross-attention (decoder-encoder attention)
         self.cross_attn = MultiheadAttention(
-            embed_dim=d_model, num_heads=num_heads, dropout=dropout, batch_first=True
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+            kdim=kdim,
+            vdim=vdim,
         )
 
         # Feed-forward network
@@ -109,6 +119,8 @@ class Decoder(nn.Module):
         max_seq_length=5000,
         dropout=0.1,
         padding_idx=0,
+        kdim=64,
+        vdim=64,
     ):
         """
         Args:
@@ -134,7 +146,10 @@ class Decoder(nn.Module):
 
         # Decoder layers
         self.layers = nn.ModuleList(
-            [DecoderLayer(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)]
+            [
+                DecoderLayer(d_model, num_heads, d_ff, dropout, kdim, vdim)
+                for _ in range(num_layers)
+            ]
         )
 
         # Final layer normalization

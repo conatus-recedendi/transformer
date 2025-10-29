@@ -8,12 +8,17 @@ from .positional_encoding import PositionalEncoding
 class EncoderLayer(nn.Module):
     """Single Transformer Encoder Layer"""
 
-    def __init__(self, d_model, num_heads, d_ff, dropout=0.1):
+    def __init__(self, d_model, num_heads, d_ff, dropout=0.1, kdim=64, vdim=64):
         super(EncoderLayer, self).__init__()
 
         # Multi-head self-attention
         self.self_attn = MultiheadAttention(
-            embed_dim=d_model, num_heads=num_heads, dropout=dropout, batch_first=True
+            embed_dim=d_model,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True,
+            kdim=kdim,
+            vdim=vdim,
         )
 
         # Feed-forward network
@@ -82,6 +87,8 @@ class Encoder(nn.Module):
         max_seq_length=5000,
         dropout=0.1,
         padding_idx=0,
+        kdim=64,
+        vdim=64,
     ):
         """
         Args:
@@ -93,6 +100,8 @@ class Encoder(nn.Module):
             max_seq_length: Maximum sequence length for positional encoding
             dropout: Dropout probability
             padding_idx: Index of padding token
+            kdim: Dimension of key vectors
+            vdim: Dimension of value vectors
         """
         super(Encoder, self).__init__()
 
@@ -107,7 +116,10 @@ class Encoder(nn.Module):
 
         # Encoder layers
         self.layers = nn.ModuleList(
-            [EncoderLayer(d_model, num_heads, d_ff, dropout) for _ in range(num_layers)]
+            [
+                EncoderLayer(d_model, num_heads, d_ff, dropout, kdim=kdim, vdim=vdim)
+                for _ in range(num_layers)
+            ]
         )
 
         # Final layer normalization

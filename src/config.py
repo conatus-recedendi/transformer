@@ -21,6 +21,8 @@ class Config:
         self.FFN_DIM = 2048
         self.DROPOUT = 0.1
         self.MAX_SEQ_LENGTH = 512
+        self.KDIM = 64  # Key dimension for attention
+        self.VDIM = 64  # Value dimension for attention
 
         # Training parameters (matching training section in JSON)
         self.BATCH_SIZE = 32
@@ -102,6 +104,8 @@ class Config:
                 "ffn_dim": self.FFN_DIM,
                 "dropout": self.DROPOUT,
                 "max_seq_length": self.MAX_SEQ_LENGTH,
+                "kdim": self.KDIM,
+                "vdim": self.VDIM,
             },
             "training": {
                 "batch_size": self.BATCH_SIZE,
@@ -169,6 +173,8 @@ class Config:
             config.FFN_DIM = model.get("ffn_dim", config.FFN_DIM)
             config.DROPOUT = model.get("dropout", config.DROPOUT)
             config.MAX_SEQ_LENGTH = model.get("max_seq_length", config.MAX_SEQ_LENGTH)
+            config.KDIM = model.get("kdim", config.KDIM)
+            config.VDIM = model.get("vdim", config.VDIM)
 
         # Training parameters
         if "training" in json_data:
@@ -372,6 +378,8 @@ class Config:
         num_encoder_layers = self.NUM_ENCODER_LAYERS
         num_decoder_layers = self.NUM_DECODER_LAYERS
         d_ff = self.FFN_DIM
+        kdim = self.KDIM
+        vdim = self.VDIM
 
         # 임베딩 레이어 파라미터
         src_embedding_params = src_vocab_size * d_model
@@ -380,7 +388,10 @@ class Config:
 
         # 어텐션 레이어 파라미터 (per layer)
         # Q, K, V projections + output projection
-        attention_params_per_layer = 4 * (d_model * d_model)
+        # Q: d_model -> kdim, K: d_model -> kdim, V: d_model -> vdim, Output: vdim -> d_model
+        attention_params_per_layer = (
+            (d_model * kdim) + (d_model * kdim) + (d_model * vdim) + (vdim * d_model)
+        )
 
         # Feed-forward 레이어 파라미터 (per layer)
         # Two linear layers

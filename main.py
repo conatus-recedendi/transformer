@@ -38,6 +38,12 @@ def parse_arguments():
         "--ffn_dim", type=int, default=2048, help="Feed-forward network dimension"
     )
     parser.add_argument("--dropout", type=float, default=0.1, help="Dropout rate")
+    parser.add_argument(
+        "--kdim", type=int, default=64, help="Key dimension for attention"
+    )
+    parser.add_argument(
+        "--vdim", type=int, default=64, help="Value dimension for attention"
+    )
 
     # Training parameters
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
@@ -107,6 +113,8 @@ def setup_config(args) -> Config:
         "NUM_DECODER_LAYERS": args.num_decoder_layers,
         "FFN_DIM": args.ffn_dim,
         "DROPOUT": args.dropout,
+        "KDIM": args.kdim,
+        "VDIM": args.vdim,
         "BATCH_SIZE": args.batch_size,
         "LEARNING_RATE": args.learning_rate,
         "MAX_EPOCHS": args.max_epochs,
@@ -245,6 +253,8 @@ def create_model(config: Config) -> torch.nn.Module:
     print(f"  - Target vocabulary size: {config.VOCAB_SIZE}")
     print(f"  - Max sequence length: {config.MAX_SEQ_LENGTH}")
     print(f"  - Dropout: {config.DROPOUT}")
+    print(f"  - Key dimension (kdim): {config.KDIM}")
+    print(f"  - Value dimension (vdim): {config.VDIM}")
 
     model = Transformer(
         src_vocab_size=config.VOCAB_SIZE,
@@ -258,6 +268,8 @@ def create_model(config: Config) -> torch.nn.Module:
         dropout=config.DROPOUT,
         pad_token_id=config.PAD_TOKEN,
         tie_weights=True,  # Tie embedding and output projection weights
+        kdim=config.KDIM,
+        vdim=config.VDIM,
     )
 
     return model
