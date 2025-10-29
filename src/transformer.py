@@ -98,7 +98,7 @@ class Transformer(nn.Module):
         if not self.tie_weights:
             nn.init.uniform_(self.output_projection.weight, -0.1, 0.1)
 
-        print(f"Transformer: Initialized all parameters with U[-0.1, 0.1]")
+    # /        print(f"Transformer: Initialized all parameters with U[-0.1, 0.1]")
 
     def forward(
         self,

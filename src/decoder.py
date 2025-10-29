@@ -169,7 +169,7 @@ class Decoder(nn.Module):
         nn.init.uniform_(self.norm.weight, -0.1, 0.1)
         nn.init.uniform_(self.norm.bias, -0.1, 0.1)
 
-        print(f"Decoder: Initialized all parameters with U[-0.1, 0.1]")
+        # print(f"Decoder: Initialized all parameters with U[-0.1, 0.1]")
 
     def forward(
         self,

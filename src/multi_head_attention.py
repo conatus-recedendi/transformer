@@ -32,10 +32,11 @@ class MultiheadAttention(nn.Module):
         # Head dimension
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
         self.head_dim = embed_dim // num_heads
+        q_k_embed_dim = self.kdim * num_heads
 
         # Linear projections for Q, K, V (all heads combined)
-        self.q_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.k_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.q_linear = nn.Linear(q_k_embed_dim, q_k_embed_dim, bias=bias)
+        self.k_linear = nn.Linear(q_k_embed_dim, q_k_embed_dim, bias=bias)
         self.v_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
 
         # Output projection
@@ -54,7 +55,7 @@ class MultiheadAttention(nn.Module):
             if module.bias is not None:
                 nn.init.uniform_(module.bias, -0.1, 0.1)
 
-        print(f"MultiheadAttention: Initialized all parameters with U[-0.1, 0.1]")
+        # print(f"MultiheadAttention: Initialized all parameters with U[-0.1, 0.1]")
 
     def forward(self, query, key, value, key_padding_mask=None, attn_mask=None):
         """
@@ -88,6 +89,7 @@ class MultiheadAttention(nn.Module):
 
         # Reshape for multi-head attention
         # [batch_size, seq_len, embed_dim] -> [batch_size, seq_len, num_heads, head_dim]
+        # Q = Q.view(batch_size, tgt_len, self.num_heads, self.kdim)
         Q = Q.view(batch_size, tgt_len, self.num_heads, self.kdim)
         K = K.view(batch_size, src_len, self.num_heads, self.kdim)
         V = V.view(batch_size, src_len, self.num_heads, self.vdim)
