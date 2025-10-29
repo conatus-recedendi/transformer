@@ -109,15 +109,15 @@ class Encoder(nn.Module):
         self.num_layers = num_layers
 
         # Input embedding
-        self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=padding_idx)
+        self.embedding = nn.Embedding(vocab_size, kdim, padding_idx=padding_idx)
 
         # Positional encoding
-        self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
+        self.pos_encoding = PositionalEncoding(kdim, max_seq_length, dropout)
 
         # Encoder layers
         self.layers = nn.ModuleList(
             [
-                EncoderLayer(d_model, num_heads, d_ff, dropout, kdim=kdim, vdim=vdim)
+                EncoderLayer(kdim, num_heads, d_ff, dropout, kdim=kdim, vdim=vdim)
                 for _ in range(num_layers)
             ]
         )
