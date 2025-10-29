@@ -123,7 +123,7 @@ class Encoder(nn.Module):
         )
 
         # Final layer normalization
-        self.norm = nn.LayerNorm(d_model)
+        # self.norm = nn.LayerNorm(d_model)
 
         # Initialize weights
         self._initialize_weights()
@@ -139,27 +139,27 @@ class Encoder(nn.Module):
 
         print(f"Encoder: Initialized all parameters with U[-0.1, 0.1]")
 
-    def forward(self, src, src_mask=None, src_key_padding_mask=None):
+    def forward(self, x, src_mask=None, src_key_padding_mask=None):
         """
         Args:
-            src: [batch_size, seq_len] input token indices
+            src: [batch_size, seq_len, d_model] input token indices
             src_mask: [seq_len, seq_len] attention mask (optional)
             src_key_padding_mask: [batch_size, seq_len] padding mask (optional)
         Returns:
             output: [batch_size, seq_len, d_model] encoded representations
         """
         # Input embedding with scaling
-        x = self.embedding(src) * math.sqrt(self.d_model)
+        # x = self.embedding(src) * math.sqrt(self.d_model)
 
         # Add positional encoding
-        x = self.pos_encoding(x)
+        # x = self.pos_encoding(x)
 
         # Pass through encoder layers
         for layer in self.layers:
             x = layer(x, src_mask, src_key_padding_mask)
 
         # Final layer normalization
-        x = self.norm(x)
+        # x = self.norm(x)  # TODO: is it necessary?
 
         return x
 

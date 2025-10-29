@@ -139,10 +139,10 @@ class Decoder(nn.Module):
         self.num_layers = num_layers
 
         # Target embedding
-        self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=padding_idx)
+        # self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=padding_idx)
 
         # Positional encoding
-        self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
+        # self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
 
         # Decoder layers
         self.layers = nn.ModuleList(
@@ -153,7 +153,7 @@ class Decoder(nn.Module):
         )
 
         # Final layer normalization
-        self.norm = nn.LayerNorm(d_model)
+        # self.norm = nn.LayerNorm(d_model)
 
         # Initialize weights
         self._initialize_weights()
@@ -171,7 +171,7 @@ class Decoder(nn.Module):
 
     def forward(
         self,
-        tgt,
+        x,
         encoder_output,
         tgt_mask=None,
         memory_mask=None,
@@ -180,7 +180,7 @@ class Decoder(nn.Module):
     ):
         """
         Args:
-            tgt: [batch_size, tgt_len] target token indices
+            tgt: [batch_size, tgt_len, d_model] target token indices
             encoder_output: [batch_size, src_len, d_model] encoder output
             tgt_mask: [tgt_len, tgt_len] causal mask for target
             memory_mask: [tgt_len, src_len] mask for cross attention
@@ -190,10 +190,10 @@ class Decoder(nn.Module):
             output: [batch_size, tgt_len, d_model] decoded representations
         """
         # Target embedding with scaling
-        x = self.embedding(tgt) * math.sqrt(self.d_model)
+        # x = self.embedding(tgt) * math.sqrt(self.d_model)
 
         # Add positional encoding
-        x = self.pos_encoding(x)
+        # x = self.pos_encoding(x)
 
         # Pass through decoder layers
         for layer in self.layers:
@@ -207,7 +207,7 @@ class Decoder(nn.Module):
             )
 
         # Final layer normalization
-        x = self.norm(x)
+        # x = self.norm(x)
 
         return x
 

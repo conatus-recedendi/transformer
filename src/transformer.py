@@ -1,8 +1,10 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .encoder import Encoder
 from .decoder import Decoder, create_causal_mask, create_padding_mask
+from .positional_encoding import PositionalEncoding
 
 
 class Transformer(nn.Module):
@@ -45,6 +47,13 @@ class Transformer(nn.Module):
         self.d_model = d_model
         self.pad_token_id = pad_token_id
         self.tie_weights = tie_weights
+
+        # Input embedding
+        # src_vocab_size alwasy equals tgt_vocab_size. bcz of shared BPE
+        self.embedding = nn.Embedding(src_vocab_size, d_model, padding_idx=pad_token_id)
+
+        # Positional encoding
+        self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
 
         # Encoder
         self.encoder = Encoder(
@@ -131,14 +140,21 @@ class Transformer(nn.Module):
             tgt_len = tgt.size(1)
             tgt_mask = create_causal_mask(tgt_len, device=tgt.device)
 
+        x = self.embedding(src) * math.sqrt(
+            self.d_model
+        )  # [batch_size, src_len, d_model] Input embedding with scaling
+        x = self.pos_encoding(x)
         # Encoder forward pass
         encoder_output = self.encoder(
-            src, src_mask=src_mask, src_key_padding_mask=src_key_padding_mask
+            x, src_mask=src_mask, src_key_padding_mask=src_key_padding_mask
         )
-
+        y = self.embedding(tgt) * math.sqrt(
+            self.d_model
+        )  # [batch_size, tgt_len, d_model] Input embedding with scaling
+        y = self.pos_encoding(y)
         # Decoder forward pass
         decoder_output = self.decoder(
-            tgt,
+            y,
             encoder_output,
             tgt_mask=tgt_mask,
             memory_mask=None,  # Usually not used
