@@ -19,6 +19,7 @@ class EncoderLayer(nn.Module):
             batch_first=True,
             kdim=kdim,
             vdim=vdim,
+            bias=False,
         )
 
         # Feed-forward network

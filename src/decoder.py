@@ -19,6 +19,7 @@ class DecoderLayer(nn.Module):
             batch_first=True,
             kdim=kdim,
             vdim=vdim,
+            bias=False,
         )
 
         # Multi-head cross-attention (decoder-encoder attention)
@@ -29,6 +30,7 @@ class DecoderLayer(nn.Module):
             batch_first=True,
             kdim=kdim,
             vdim=vdim,
+            bias=False,
         )
 
         # Feed-forward network
