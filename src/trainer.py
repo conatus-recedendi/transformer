@@ -9,6 +9,8 @@ from torch.utils.data import DataLoader
 import numpy as np
 import time
 import os
+import gc
+import psutil
 from typing import Dict, Any, Optional, Tuple
 import logging
 from tqdm import tqdm
@@ -94,6 +96,12 @@ class Trainer:
         self.current_epoch = 0
         self.global_step = 0
         self.best_val_loss = float("inf")
+        
+        # GPU 메모리 모니터링을 위한 변수들
+        self.memory_cleanup_interval = 50  # N 스텝마다 메모리 정리
+        self.max_gpu_memory_mb = None
+        if torch.cuda.is_available():
+            self.max_gpu_memory_mb = torch.cuda.get_device_properties(0).total_memory / (1024**2)
 
         # Setup logging
         self._setup_logging()
@@ -107,15 +115,18 @@ class Trainer:
         # Ensure log directory exists
         os.makedirs(self.config.LOG_PATH, exist_ok=True)
 
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            handlers=[
-                logging.FileHandler(os.path.join(self.config.LOG_PATH, "training.log")),
-                logging.StreamHandler(),
-            ],
-        )
+        # 중복 로깅 설정 방지 - 메인 스크립트에서 이미 설정했으므로 기존 로거 사용
         self.logger = logging.getLogger(__name__)
+        
+        # 파일 핸들러만 추가 (콘솔 출력은 메인에서 처리)
+        if not any(isinstance(h, logging.FileHandler) for h in self.logger.handlers):
+            file_handler = logging.FileHandler(
+                os.path.join(self.config.LOG_PATH, "training.log")
+            )
+            file_handler.setFormatter(
+                logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            )
+            self.logger.addHandler(file_handler)
 
     def train_epoch(self) -> Dict[str, float]:
         """Train for one epoch"""
@@ -125,51 +136,64 @@ class Trainer:
 
         progress_bar = tqdm(self.train_loader, desc=f"Epoch {self.current_epoch + 1}")
 
-        for batch_idx, batch in enumerate(progress_bar):
-            # Move batch to device
-            batch = {
-                k: v.to(self.device) if isinstance(v, torch.Tensor) else v
-                for k, v in batch.items()
-            }
-
-            # Forward pass
-            loss = self._forward_step(batch)
-
-            # Backward pass
-            self.optimizer.zero_grad()
-            loss.backward()
-
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(
-                self.model.parameters(), self.config.GRADIENT_CLIP
-            )
-
-            # Update parameters
-            self.optimizer.step()
-            self.scheduler.step()
-
-            # Update metrics
-            total_loss += loss.item()
-            self.global_step += 1
-
-            # Update progress bar
-            progress_bar.set_postfix(
-                {
-                    "loss": f"{loss.item():.4f}",
-                    "avg_loss": f"{total_loss / (batch_idx + 1):.4f}",
-                    "lr": f"{self.optimizer.param_groups[0]['lr']:.2e}",
+        try:
+            for batch_idx, batch in enumerate(progress_bar):
+                # Move batch to device
+                batch = {
+                    k: v.to(self.device) if isinstance(v, torch.Tensor) else v
+                    for k, v in batch.items()
                 }
-            )
 
-            # Validation and saving
-            if self.global_step % self.config.EVAL_EVERY == 0 and self.val_loader:
-                val_metrics = self.validate()
-                self.logger.info(
-                    f"Step {self.global_step} - Val Loss: {val_metrics['loss']:.4f}"
+                # Forward pass
+                loss = self._forward_step(batch)
+
+                # Backward pass
+                self.optimizer.zero_grad()
+                loss.backward()
+
+                # Gradient clipping
+                torch.nn.utils.clip_grad_norm_(
+                    self.model.parameters(), self.config.GRADIENT_CLIP
                 )
 
-            if self.global_step % self.config.SAVE_EVERY == 0:
-                self._save_checkpoint()
+                # Update parameters
+                self.optimizer.step()
+                self.scheduler.step()
+
+                # Update metrics
+                total_loss += loss.item()
+                self.global_step += 1
+
+                # Update progress bar
+                progress_bar.set_postfix(
+                    {
+                        "loss": f"{loss.item():.4f}",
+                        "avg_loss": f"{total_loss / (batch_idx + 1):.4f}",
+                        "lr": f"{self.optimizer.param_groups[0]['lr']:.2e}",
+                    }
+                )
+
+                # 메모리 정리
+                del loss
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
+                # Validation and saving
+                if self.global_step % self.config.EVAL_EVERY == 0 and self.val_loader:
+                    val_metrics = self.validate()
+                    self.logger.info(
+                        f"Step {self.global_step} - Val Loss: {val_metrics['loss']:.4f}"
+                    )
+
+                if self.global_step % self.config.SAVE_EVERY == 0:
+                    self._save_checkpoint()
+        
+        finally:
+            # progress bar 정리
+            progress_bar.close()
+            # 메모리 정리
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         return {"loss": total_loss / num_batches}
 
@@ -203,26 +227,36 @@ class Trainer:
         total_loss = 0.0
         num_batches = len(self.val_loader)
 
-        with torch.no_grad():
-            for batch in self.val_loader:
-                # Move batch to device
-                batch = {
-                    k: v.to(self.device) if isinstance(v, torch.Tensor) else v
-                    for k, v in batch.items()
-                }
+        try:
+            with torch.no_grad():
+                for batch in self.val_loader:
+                    # Move batch to device
+                    batch = {
+                        k: v.to(self.device) if isinstance(v, torch.Tensor) else v
+                        for k, v in batch.items()
+                    }
 
-                # Forward pass
-                loss = self._forward_step(batch)
-                total_loss += loss.item()
+                    # Forward pass
+                    loss = self._forward_step(batch)
+                    total_loss += loss.item()
+                    
+                    # 메모리 정리
+                    del loss
 
-        avg_loss = total_loss / num_batches
+            avg_loss = total_loss / num_batches
 
-        # Update best validation loss
-        if avg_loss < self.best_val_loss:
-            self.best_val_loss = avg_loss
-            self._save_checkpoint(is_best=True)
+            # Update best validation loss
+            if avg_loss < self.best_val_loss:
+                self.best_val_loss = avg_loss
+                self._save_checkpoint(is_best=True)
 
-        self.model.train()
+        finally:
+            # 반드시 training 모드로 복원
+            self.model.train()
+            # 메모리 정리
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
         return {"loss": avg_loss}
 
     def train(self):
@@ -262,20 +296,29 @@ class Trainer:
         total_loss = 0.0
         num_batches = len(self.test_loader)
 
-        with torch.no_grad():
-            for batch in tqdm(self.test_loader, desc="Testing"):
-                # Move batch to device
-                batch = {
-                    k: v.to(self.device) if isinstance(v, torch.Tensor) else v
-                    for k, v in batch.items()
-                }
+        try:
+            with torch.no_grad():
+                for batch in tqdm(self.test_loader, desc="Testing"):
+                    # Move batch to device
+                    batch = {
+                        k: v.to(self.device) if isinstance(v, torch.Tensor) else v
+                        for k, v in batch.items()
+                    }
 
-                # Forward pass
-                loss = self._forward_step(batch)
-                total_loss += loss.item()
+                    # Forward pass
+                    loss = self._forward_step(batch)
+                    total_loss += loss.item()
+                    
+                    # 메모리 정리
+                    del loss
 
-        avg_loss = total_loss / num_batches
-        self.logger.info(f"Test Loss: {avg_loss:.4f}")
+            avg_loss = total_loss / num_batches
+            self.logger.info(f"Test Loss: {avg_loss:.4f}")
+
+        finally:
+            # 메모리 정리
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
         return {"loss": avg_loss}
 
