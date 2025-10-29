@@ -435,23 +435,228 @@ class Config:
         return total_params
 
     def print_estimated_model_info(self):
-        """추정된 모델 정보 출력"""
-        estimated_params = self.estimate_model_parameters()
+        """추정된 모델 정보를 컴포넌트별로 상세하게 출력"""
 
-        print(f"\n🔮 Estimated Model Information by config:")
-        print(f"  Estimated parameters: {estimated_params:,}")
-        print(
-            f"  Estimated model size: {estimated_params * 4 / (1024**2):.1f} MB (float32)"
+        # 어휘 크기 결정
+        if hasattr(self, "SRC_VOCAB_SIZE") and hasattr(self, "TGT_VOCAB_SIZE"):
+            src_vocab_size = self.SRC_VOCAB_SIZE
+            tgt_vocab_size = self.TGT_VOCAB_SIZE
+        else:
+            src_vocab_size = self.VOCAB_SIZE
+            tgt_vocab_size = self.VOCAB_SIZE
+
+        d_model = self.MODEL_DIM
+        num_heads = self.NUM_HEADS
+        num_encoder_layers = self.NUM_ENCODER_LAYERS
+        num_decoder_layers = self.NUM_DECODER_LAYERS
+        d_ff = self.FFN_DIM
+        kdim = self.KDIM
+        vdim = self.VDIM
+
+        # 컴포넌트별 파라미터 계산
+
+        # 1. 임베딩 레이어
+        src_embedding_params = src_vocab_size * d_model
+        tgt_embedding_params = tgt_vocab_size * d_model
+        positional_embedding_params = self.MAX_SEQ_LENGTH * d_model
+        embedding_params = (
+            src_embedding_params + tgt_embedding_params + positional_embedding_params
         )
 
+        # 2. 인코더
+        attention_params_per_layer = (
+            (d_model * kdim) + (d_model * kdim) + (d_model * vdim) + (vdim * d_model)
+        )
+        ff_params_per_layer = d_model * d_ff + d_ff * d_model
+        encoder_ln_params_per_layer = 2 * d_model * 2  # 2 layer norms, weight + bias
+        encoder_params_per_layer = (
+            attention_params_per_layer
+            + ff_params_per_layer
+            + encoder_ln_params_per_layer
+        )
+        encoder_params = num_encoder_layers * encoder_params_per_layer
+
+        # 3. 디코더
+        decoder_attention_params_per_layer = (
+            2 * attention_params_per_layer
+        )  # self + cross attention
+        decoder_ln_params_per_layer = 3 * d_model * 2  # 3 layer norms, weight + bias
+        decoder_params_per_layer = (
+            decoder_attention_params_per_layer
+            + ff_params_per_layer
+            + decoder_ln_params_per_layer
+        )
+        decoder_params = num_decoder_layers * decoder_params_per_layer
+
+        # 4. 출력 프로젝션
+        if getattr(self, "tie_weights", True):
+            output_projection_params = 0  # Shared with tgt embedding
+        else:
+            output_projection_params = d_model * tgt_vocab_size
+
+        # 총 파라미터
+        total_params = (
+            embedding_params
+            + encoder_params
+            + decoder_params
+            + output_projection_params
+        )
+
+        print(f"\n🔮 Estimated Model Information by Config:")
+        print("=" * 70)
+
+        # 전체 요약
+        print(f"📊 Total Parameters: {total_params:,}")
+        print(f"💾 Model Size: {total_params * 4 / (1024**2):.1f} MB (float32)")
+
         # 스케일 분류
-        if estimated_params < 10_000_000:
+        if total_params < 10_000_000:
             scale = "Small (< 10M)"
-        elif estimated_params < 100_000_000:
+        elif total_params < 100_000_000:
             scale = "Medium (10M - 100M)"
-        elif estimated_params < 1_000_000_000:
+        elif total_params < 1_000_000_000:
             scale = "Large (100M - 1B)"
         else:
             scale = "Very Large (> 1B)"
+        print(f"🏷️  Model Scale: {scale}")
 
-        print(f"  Model scale: {scale}")
+        print("\n📋 Component Breakdown:")
+        print("-" * 70)
+
+        # 1. 임베딩
+        print(
+            f"🔤 Embeddings: {embedding_params:,} parameters ({embedding_params/total_params*100:.1f}%)"
+        )
+        print(
+            f"  ├─ Source Embedding: {src_embedding_params:,} ({src_vocab_size:,} × {d_model})"
+        )
+        print(
+            f"  ├─ Target Embedding: {tgt_embedding_params:,} ({tgt_vocab_size:,} × {d_model})"
+        )
+        print(
+            f"  └─ Positional Encoding: {positional_embedding_params:,} ({self.MAX_SEQ_LENGTH} × {d_model})"
+        )
+
+        # 2. 인코더
+        print(
+            f"\n🔄 Encoder ({num_encoder_layers} layers): {encoder_params:,} parameters ({encoder_params/total_params*100:.1f}%)"
+        )
+        print(f"  ├─ Per Layer: {encoder_params_per_layer:,} parameters")
+        print(f"  │  ├─ Self-Attention: {attention_params_per_layer:,}")
+        print(f"  │  │  ├─ Q projection: {d_model * kdim:,} ({d_model} → {kdim})")
+        print(f"  │  │  ├─ K projection: {d_model * kdim:,} ({d_model} → {kdim})")
+        print(f"  │  │  ├─ V projection: {d_model * vdim:,} ({d_model} → {vdim})")
+        print(f"  │  │  └─ Output projection: {vdim * d_model:,} ({vdim} → {d_model})")
+        print(f"  │  ├─ Feed-Forward: {ff_params_per_layer:,}")
+        print(f"  │  │  ├─ Linear 1: {d_model * d_ff:,} ({d_model} → {d_ff})")
+        print(f"  │  │  └─ Linear 2: {d_ff * d_model:,} ({d_ff} → {d_model})")
+        print(
+            f"  │  └─ Layer Norms: {encoder_ln_params_per_layer:,} (2 layers × {d_model} × 2)"
+        )
+
+        # 3. 디코더
+        print(
+            f"\n🎯 Decoder ({num_decoder_layers} layers): {decoder_params:,} parameters ({decoder_params/total_params*100:.1f}%)"
+        )
+        print(f"  ├─ Per Layer: {decoder_params_per_layer:,} parameters")
+        print(f"  │  ├─ Self-Attention: {attention_params_per_layer:,}")
+        print(f"  │  ├─ Cross-Attention: {attention_params_per_layer:,}")
+        print(f"  │  ├─ Feed-Forward: {ff_params_per_layer:,}")
+        print(
+            f"  │  └─ Layer Norms: {decoder_ln_params_per_layer:,} (3 layers × {d_model} × 2)"
+        )
+
+        # 4. 출력 프로젝션
+        if output_projection_params > 0:
+            print(
+                f"\n📤 Output Projection: {output_projection_params:,} parameters ({output_projection_params/total_params*100:.1f}%)"
+            )
+            print(
+                f"  └─ Linear: {output_projection_params:,} ({d_model} → {tgt_vocab_size:,})"
+            )
+        else:
+            print(
+                f"\n📤 Output Projection: Shared with target embedding (tie_weights=True)"
+            )
+
+        print("\n📈 Architecture Summary:")
+        print(f"  ├─ Model Dimension (d_model): {d_model}")
+        print(f"  ├─ Attention Heads: {num_heads}")
+        print(f"  ├─ Key/Value Dimensions: {kdim}/{vdim}")
+        print(f"  ├─ Feed-Forward Dimension: {d_ff}")
+        print(f"  ├─ Encoder Layers: {num_encoder_layers}")
+        print(f"  ├─ Decoder Layers: {num_decoder_layers}")
+        print(f"  ├─ Source Vocabulary: {src_vocab_size:,}")
+        print(f"  ├─ Target Vocabulary: {tgt_vocab_size:,}")
+        print(f"  └─ Max Sequence Length: {self.MAX_SEQ_LENGTH}")
+
+        # 메모리 추정
+        print(f"\n💾 Memory Estimation (Training):")
+        params_memory = total_params * 4 / (1024**2)  # float32
+        gradients_memory = total_params * 4 / (1024**2)  # gradients
+        optimizer_memory = total_params * 8 / (1024**2)  # Adam (2 states)
+        total_memory = params_memory + gradients_memory + optimizer_memory
+
+        print(f"  ├─ Parameters: {params_memory:.1f} MB")
+        print(f"  ├─ Gradients: {gradients_memory:.1f} MB")
+        print(f"  ├─ Optimizer States: {optimizer_memory:.1f} MB")
+        print(f"  └─ Total Model Memory: {total_memory:.1f} MB")
+
+        # 유명한 모델들과 비교
+        print(f"\n🏆 Model Comparison:")
+        comparisons = [
+            ("Transformer Base (Paper)", 65_000_000),
+            ("Transformer Big (Paper)", 213_000_000),
+            ("BERT Base", 110_000_000),
+            ("BERT Large", 340_000_000),
+            ("GPT-2 Small", 117_000_000),
+            ("GPT-2 Medium", 345_000_000),
+            ("T5 Base", 220_000_000),
+        ]
+
+        closest_model = None
+        min_diff = float("inf")
+
+        for name, params in comparisons:
+            diff = abs(total_params - params) / params
+            if diff < min_diff:
+                min_diff = diff
+                closest_model = (name, params, diff)
+
+            if diff < 0.1:  # Within 10%
+                print(
+                    f"  🎯 Similar to {name}: {params:,} parameters ({diff*100:.1f}% difference)"
+                )
+                break
+
+        if closest_model and min_diff >= 0.1:
+            name, params, diff = closest_model
+            if total_params < params:
+                print(
+                    f"  📉 Closest to {name}: {params:,} parameters ({diff*100:.1f}% smaller)"
+                )
+            else:
+                print(
+                    f"  📈 Closest to {name}: {params:,} parameters ({diff*100:.1f}% larger)"
+                )
+
+        # 상세 파라미터 분포
+        print(f"\n📊 Detailed Parameter Distribution:")
+        components = [
+            ("Embeddings", embedding_params),
+            ("Encoder", encoder_params),
+            ("Decoder", decoder_params),
+            (
+                "Output Projection",
+                output_projection_params if output_projection_params > 0 else 0,
+            ),
+        ]
+
+        print("  Component           Parameters      Percentage")
+        print("  " + "-" * 50)
+        for name, params in components:
+            if params > 0:
+                percentage = params / total_params * 100
+                print(f"  {name:<18} {params:>12,} {percentage:>9.1f}%")
+
+        print("=" * 70)
