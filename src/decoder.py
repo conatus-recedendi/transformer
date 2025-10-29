@@ -153,7 +153,7 @@ class Decoder(nn.Module):
         )
 
         # Final layer normalization
-        # self.norm = nn.LayerNorm(d_model)
+        self.norm = nn.LayerNorm(d_model)
 
         # Initialize weights
         self._initialize_weights()
@@ -164,8 +164,8 @@ class Decoder(nn.Module):
         # nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
 
         # Initialize final layer norm
-        # nn.init.uniform_(self.norm.weight, -0.1, 0.1)
-        # nn.init.uniform_(self.norm.bias, -0.1, 0.1)
+        nn.init.uniform_(self.norm.weight, -0.1, 0.1)
+        nn.init.uniform_(self.norm.bias, -0.1, 0.1)
 
         print(f"Decoder: Initialized all parameters with U[-0.1, 0.1]")
 
@@ -207,7 +207,7 @@ class Decoder(nn.Module):
             )
 
         # Final layer normalization
-        # x = self.norm(x)
+        x = self.norm(x)
 
         return x
 
