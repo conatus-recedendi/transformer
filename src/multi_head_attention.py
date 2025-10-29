@@ -18,7 +18,7 @@ class MultiheadAttention(nn.Module):
         batch_first=False,
     ):
         super(MultiheadAttention, self).__init__()
-        self.embed_dim = embed_dim
+        # self.embed_dim = embed_dim
         self.num_heads = num_heads
         self.dropout = dropout
         self.bias = bias
@@ -34,11 +34,11 @@ class MultiheadAttention(nn.Module):
 
         # Linear projections for Q, K, V (all heads combined)
         self.q_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
-        self.k_linear = nn.Linear(self.kdim, embed_dim, bias=bias)
-        self.v_linear = nn.Linear(self.vdim, embed_dim, bias=bias)
+        self.k_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.v_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
 
         # Output projection
-        self.out_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.out_linear = nn.Linear(self.vdim, self.vdim, bias=bias)
 
         # Dropout layer
         self.dropout_layer = nn.Dropout(dropout)
@@ -77,19 +77,19 @@ class MultiheadAttention(nn.Module):
             key = key.transpose(0, 1)
             value = value.transpose(0, 1)
 
-        batch_size, tgt_len, embed_dim = query.size()
+        batch_size, tgt_len, d_embed = query.size()
         src_len = key.size(1)
 
         # Linear projections for Q, K, V
-        Q = self.q_linear(query)  # [batch_size, tgt_len, embed_dim]
-        K = self.k_linear(key)  # [batch_size, src_len, embed_dim]
-        V = self.v_linear(value)  # [batch_size, src_len, embed_dim]
+        Q = self.q_linear(query)  # [batch_size, tgt_len, kdim]
+        K = self.k_linear(key)  # [batch_size, src_len, kdim]
+        V = self.v_linear(value)  # [batch_size, src_len, vdim]
 
         # Reshape for multi-head attention
         # [batch_size, seq_len, embed_dim] -> [batch_size, seq_len, num_heads, head_dim]
-        Q = Q.view(batch_size, tgt_len, self.num_heads, self.head_dim)
-        K = K.view(batch_size, src_len, self.num_heads, self.head_dim)
-        V = V.view(batch_size, src_len, self.num_heads, self.head_dim)
+        Q = Q.view(batch_size, tgt_len, self.num_heads, self.kdim)
+        K = K.view(batch_size, src_len, self.num_heads, self.kdim)
+        V = V.view(batch_size, src_len, self.num_heads, self.vdim)
 
         # Transpose to [batch_size, num_heads, seq_len, head_dim]
         Q = Q.transpose(1, 2)
@@ -101,11 +101,11 @@ class MultiheadAttention(nn.Module):
             Q, K, V, key_padding_mask, attn_mask
         )
 
-        # Concatenate heads: [batch_size, num_heads, tgt_len, head_dim] -> [batch_size, tgt_len, embed_dim]
+        # Concatenate heads: [batch_size, num_heads, tgt_len, vdim] -> [batch_size, tgt_len, embed_dim]
         attn_output = (
             attn_output.transpose(1, 2)
             .contiguous()
-            .view(batch_size, tgt_len, embed_dim)
+            .view(batch_size, tgt_len, self.embed_dim)
         )
 
         # Output projection
@@ -124,9 +124,9 @@ class MultiheadAttention(nn.Module):
         Scaled dot-product attention
 
         Args:
-            Q: [batch_size, num_heads, tgt_len, head_dim]
-            K: [batch_size, num_heads, src_len, head_dim]
-            V: [batch_size, num_heads, src_len, head_dim]
+            Q: [batch_size, num_heads, tgt_len, kdim]
+            K: [batch_size, num_heads, src_len, kdim]
+            V: [batch_size, num_heads, src_len, vdim]
             key_padding_mask: [batch_size, src_len]
             attn_mask: [tgt_len, src_len]
 
@@ -134,13 +134,14 @@ class MultiheadAttention(nn.Module):
             attn_output: [batch_size, num_heads, tgt_len, head_dim]
             attn_weights: [batch_size, num_heads, tgt_len, src_len]
         """
-        batch_size, num_heads, tgt_len, head_dim = Q.size()
+        batch_size, num_heads, tgt_len, kdim = Q.size()
+        _, _, _, vdim = V.size()
         src_len = K.size(2)
 
         # Compute attention scores
-        # [batch_size, num_heads, tgt_len, head_dim] x [batch_size, num_heads, head_dim, src_len]
+        # [batch_size, num_heads, tgt_len, kdim] x [batch_size, num_heads, kdim, src_len]
         # -> [batch_size, num_heads, tgt_len, src_len]
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(head_dim)
+        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(kdim)
 
         # Apply attention mask if provided
         if attn_mask is not None:
@@ -162,8 +163,8 @@ class MultiheadAttention(nn.Module):
         attn_weights = self.dropout_layer(attn_weights)
 
         # Apply attention to values
-        # [batch_size, num_heads, tgt_len, src_len] x [batch_size, num_heads, src_len, head_dim]
-        # -> [batch_size, num_heads, tgt_len, head_dim]
+        # [batch_size, num_heads, tgt_len, src_len] x [batch_size, num_heads, src_len, vdim]
+        # -> [batch_size, num_heads, tgt_len, vdim]
         attn_output = torch.matmul(attn_weights, V)
 
         return attn_output, attn_weights

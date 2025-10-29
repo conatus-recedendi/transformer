@@ -139,15 +139,15 @@ class Decoder(nn.Module):
         self.num_layers = num_layers
 
         # Target embedding
-        self.embedding = nn.Embedding(vocab_size, kdim, padding_idx=padding_idx)
+        self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=padding_idx)
 
         # Positional encoding
-        self.pos_encoding = PositionalEncoding(kdim, max_seq_length, dropout)
+        self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
 
         # Decoder layers
         self.layers = nn.ModuleList(
             [
-                DecoderLayer(kdim, num_heads, d_ff, dropout, kdim, vdim)
+                DecoderLayer(d_model, num_heads, d_ff, dropout, kdim, vdim)
                 for _ in range(num_layers)
             ]
         )
