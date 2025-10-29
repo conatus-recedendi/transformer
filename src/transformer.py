@@ -346,6 +346,12 @@ class Transformer(nn.Module):
         tgt_len = tgt.size(1)
         tgt_mask = create_causal_mask(tgt_len, device=tgt.device)
 
+        src = self.embedding(src) * math.sqrt(
+            self.d_model
+        )  # [batch_size, src_len, d_model] Input embedding with scaling
+        # Add positional encoding
+        src = self.pos_encoding(src)
+
         # Get encoder attention weights
         encoder_self_attn = self.encoder.get_attention_weights(
             src, src_key_padding_mask=src_key_padding_mask
@@ -353,6 +359,12 @@ class Transformer(nn.Module):
 
         # Get encoder output
         encoder_output = self.encoder(src, src_key_padding_mask=src_key_padding_mask)
+
+        tgt = self.embedding(tgt) * math.sqrt(
+            self.d_model
+        )  # [batch_size, tgt_len, d_model] Input embedding with scaling
+        # Add positional encoding
+        tgt = self.pos_encoding(tgt)
 
         # Get decoder attention weights
         decoder_self_attn, decoder_cross_attn = self.decoder.get_attention_weights(

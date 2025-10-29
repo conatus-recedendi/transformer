@@ -109,10 +109,10 @@ class Encoder(nn.Module):
         self.num_layers = num_layers
 
         # Input embedding
-        self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=padding_idx)
+        # self.embedding = nn.Embedding(vocab_size, d_model, padding_idx=padding_idx)
 
         # Positional encoding
-        self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
+        # self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
 
         # Encoder layers
         self.layers = nn.ModuleList(
@@ -131,7 +131,7 @@ class Encoder(nn.Module):
     def _initialize_weights(self):
         """Initialize all parameters with uniform distribution U[-0.1, 0.1]"""
         # Initialize embedding
-        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
+        # nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
 
         # Initialize final layer norm
         # nn.init.uniform_(self.norm.weight, -0.1, 0.1)
@@ -163,19 +163,19 @@ class Encoder(nn.Module):
 
         return x
 
-    def get_attention_weights(self, src, src_mask=None, src_key_padding_mask=None):
+    def get_attention_weights(self, x, src_mask=None, src_key_padding_mask=None):
         """
         Get attention weights from all layers (for visualization)
 
         Args:
-            src: [batch_size, seq_len] input token indices
+            src: [batch_size, seq_len, embed_dim] input token indices
             src_mask: [seq_len, seq_len] attention mask (optional)
             src_key_padding_mask: [batch_size, seq_len] padding mask (optional)
         Returns:
             attention_weights: List of attention weights from each layer
         """
-        x = self.embedding(src) * math.sqrt(self.d_model)
-        x = self.pos_encoding(x)
+        # x = self.embedding(src) * math.sqrt(self.d_model)
+        # x = self.pos_encoding(x)
 
         attention_weights = []
 

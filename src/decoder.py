@@ -161,11 +161,11 @@ class Decoder(nn.Module):
     def _initialize_weights(self):
         """Initialize all parameters with uniform distribution U[-0.1, 0.1]"""
         # Initialize embedding
-        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
+        # nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
 
         # Initialize final layer norm
-        nn.init.uniform_(self.norm.weight, -0.1, 0.1)
-        nn.init.uniform_(self.norm.bias, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.weight, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.bias, -0.1, 0.1)
 
         print(f"Decoder: Initialized all parameters with U[-0.1, 0.1]")
 
@@ -213,7 +213,7 @@ class Decoder(nn.Module):
 
     def get_attention_weights(
         self,
-        tgt,
+        x,
         encoder_output,
         tgt_mask=None,
         memory_mask=None,
@@ -227,8 +227,8 @@ class Decoder(nn.Module):
             self_attention_weights: List of self-attention weights from each layer
             cross_attention_weights: List of cross-attention weights from each layer
         """
-        x = self.embedding(tgt) * math.sqrt(self.d_model)
-        x = self.pos_encoding(x)
+        # x = self.embedding(tgt) * math.sqrt(self.d_model)
+        # x = self.pos_encoding(x)
 
         self_attention_weights = []
         cross_attention_weights = []
