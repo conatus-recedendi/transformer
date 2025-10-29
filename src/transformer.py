@@ -88,7 +88,7 @@ class Transformer(nn.Module):
 
         # Optionally tie decoder embedding weights with output projection
         if tie_weights:
-            self.output_projection.weight = self.decoder.embedding.weight
+            self.output_projection.weight = self.embedding.weight
 
         # Initialize weights
         self._initialize_weights()
