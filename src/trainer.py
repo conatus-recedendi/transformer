@@ -176,17 +176,20 @@ class Trainer:
     def _forward_step(self, batch: Dict[str, torch.Tensor]) -> torch.Tensor:
         """Forward step for training"""
         src = batch["src"]  # [batch_size, src_len]
-        tgt = batch["tgt"]  # [batch_size, tgt_len]
+        tgt = batch["tgt"]  # [batch_size, tgt_len] - decoder input (with BOS)
+        
+        # 데이터 로더에서 제공하는 tgt_y 사용 (target output with EOS)
+        if "tgt_y" in batch:
+            tgt_output = batch["tgt_y"]  # [batch_size, tgt_len] - target output (with EOS)
+            tgt_input = tgt  # decoder input (with BOS, without EOS)
+        else:
+            # 백워드 호환성: tgt_y가 없으면 기존 방식 사용
+            tgt_input = tgt[:, :-1]  # [batch_size, tgt_len-1] - remove last token
+            tgt_output = tgt[:, 1:]   # [batch_size, tgt_len-1] - remove first token
 
         # 🔍 매 배치마다 첫 번째 샘플 데이터 보여주기
         if self.global_step % 1 == 0:  # 매 배치마다
-            self._debug_batch_sample(src, tgt, batch_idx=self.global_step)
-
-        # Create input and target for decoder
-        tgt_input = tgt[:, :-1]  # [batch_size, tgt_len-1] - remove last token
-        tgt_output = tgt[
-            :, 1:
-        ]  # [batch_size, tgt_len-1] - remove first token (usually BOS)
+            self._debug_batch_sample(src, tgt, tgt_input, tgt_output, batch_idx=self.global_step)
 
         # Forward pass through model
         logits = self.model(src, tgt_input)  # [batch_size, tgt_len-1, vocab_size]
@@ -198,7 +201,7 @@ class Trainer:
         loss = self.criterion(logits_flat, tgt_flat)
         return loss
 
-    def _debug_batch_sample(self, src, tgt, batch_idx):
+    def _debug_batch_sample(self, src, tgt, tgt_input, tgt_output, batch_idx):
         """매 배치마다 첫 번째 샘플의 상세한 데이터 분석"""
         if batch_idx > 10:  # 처음 10배치만
             return
@@ -206,16 +209,19 @@ class Trainer:
         # 첫 번째 샘플 가져오기
         src_sample = src[0]  # [src_len]
         tgt_sample = tgt[0]  # [tgt_len]
+        tgt_input_sample = tgt_input[0]  # [tgt_len-1 or tgt_len]
+        tgt_output_sample = tgt_output[0]  # [tgt_len-1 or tgt_len]
 
         self.logger.info(f"\n{'='*60}")
         self.logger.info(f"🔍 BATCH {batch_idx} - SAMPLE DEBUG")
         self.logger.info(f"{'='*60}")
 
         # 기본 정보
-        self.logger.info(f"📊 Batch shape - src: {src.shape}, tgt: {tgt.shape}")
-        self.logger.info(
-            f"📊 Sample shape - src: {src_sample.shape}, tgt: {tgt_sample.shape}"
-        )
+        self.logger.info(f"📊 Batch shapes:")
+        self.logger.info(f"   src: {src.shape}")
+        self.logger.info(f"   tgt: {tgt.shape}")
+        self.logger.info(f"   tgt_input: {tgt_input.shape}")
+        self.logger.info(f"   tgt_output: {tgt_output.shape}")
 
         # 특수 토큰 정보
         self.logger.info(
@@ -230,69 +236,76 @@ class Trainer:
             f"   전체: {src_list[:20]}{'...' if len(src_list) > 20 else ''}"
         )
         self.logger.info(
-            f"   PAD 제외: {src_nonpad[:15]}{'...' if len(src_nonpad) > 15 else ''}"
+            f"   PAD 제외: {src_nonpad[:20]}{'...' if len(src_nonpad) > 15 else ''}"
         )
 
-        # Target 분석
+        # Target 원본 분석
         tgt_list = tgt_sample.tolist()
         tgt_nonpad = [x for x in tgt_list if x != self.config.PAD_TOKEN]
-        self.logger.info(f"🎯 Target (길이 {len(tgt_list)}):")
+        self.logger.info(f"🎯 Target 원본 (길이 {len(tgt_list)}):")
         self.logger.info(
             f"   전체: {tgt_list[:20]}{'...' if len(tgt_list) > 20 else ''}"
         )
         self.logger.info(
-            f"   PAD 제외: {tgt_nonpad[:15]}{'...' if len(tgt_nonpad) > 15 else ''}"
+            f"   PAD 제외: {tgt_nonpad[:20]}{'...' if len(tgt_nonpad) > 15 else ''}"
+        )
+
+        # Target Input 분석 (디코더 입력)
+        tgt_input_list = tgt_input_sample.tolist()
+        tgt_input_nonpad = [x for x in tgt_input_list if x != self.config.PAD_TOKEN]
+        self.logger.info(f"� Target Input - 디코더 입력 (길이 {len(tgt_input_list)}):")
+        self.logger.info(
+            f"   전체: {tgt_input_list[:20]}{'...' if len(tgt_input_list) > 20 else ''}"
+        )
+        self.logger.info(
+            f"   PAD 제외: {tgt_input_nonpad[:20]}{'...' if len(tgt_input_nonpad) > 15 else ''}"
+        )
+
+        # Target Output 분석 (예측 대상)
+        tgt_output_list = tgt_output_sample.tolist()
+        tgt_output_nonpad = [x for x in tgt_output_list if x != self.config.PAD_TOKEN]
+        self.logger.info(f"� Target Output - 예측 대상 (길이 {len(tgt_output_list)}):")
+        self.logger.info(
+            f"   전체: {tgt_output_list[:20]}{'...' if len(tgt_output_list) > 20 else ''}"
+        )
+        self.logger.info(
+            f"   PAD 제외: {tgt_output_nonpad[:20]}{'...' if len(tgt_output_nonpad) > 15 else ''}"
         )
 
         # 특수 토큰 존재 확인
-        has_bos = self.config.BOS_TOKEN in tgt_list
-        has_eos = self.config.EOS_TOKEN in tgt_list
-        bos_pos = tgt_list.index(self.config.BOS_TOKEN) if has_bos else -1
-        eos_pos = tgt_list.index(self.config.EOS_TOKEN) if has_eos else -1
+        has_bos_in_input = self.config.BOS_TOKEN in tgt_input_list
+        has_eos_in_input = self.config.EOS_TOKEN in tgt_input_list
+        has_bos_in_output = self.config.BOS_TOKEN in tgt_output_list
+        has_eos_in_output = self.config.EOS_TOKEN in tgt_output_list
 
-        self.logger.info(f"🔍 Target 특수 토큰:")
-        self.logger.info(f"   BOS 존재: {has_bos} (위치: {bos_pos})")
-        self.logger.info(f"   EOS 존재: {has_eos} (위치: {eos_pos})")
-        self.logger.info(f"   첫 토큰: {tgt_list[0] if len(tgt_list) > 0 else 'N/A'}")
-        self.logger.info(
-            f"   마지막 토큰: {tgt_list[-1] if len(tgt_list) > 0 else 'N/A'}"
-        )
+        self.logger.info(f"🔍 특수 토큰 분포:")
+        self.logger.info(f"   Input에 BOS: {has_bos_in_input}, EOS: {has_eos_in_input}")
+        self.logger.info(f"   Output에 BOS: {has_bos_in_output}, EOS: {has_eos_in_output}")
+        
+        if len(tgt_input_list) > 0 and len(tgt_output_list) > 0:
+            self.logger.info(f"   Input 첫 토큰: {tgt_input_list[0]}, 마지막 토큰: {tgt_input_list[-1]}")
+            self.logger.info(f"   Output 첫 토큰: {tgt_output_list[0]}, 마지막 토큰: {tgt_output_list[-1]}")
 
-        # Teacher Forcing 처리 결과
-        if len(tgt_list) > 1:
-            tgt_input = tgt_sample[:-1].tolist()  # BOS 포함, EOS 제외
-            tgt_output = tgt_sample[1:].tolist()  # BOS 제외, EOS 포함
-
-            self.logger.info(f"📚 Teacher Forcing 처리:")
-            self.logger.info(
-                f"   입력 (decoder input): {tgt_input[:15]}{'...' if len(tgt_input) > 15 else ''}"
-            )
-            self.logger.info(
-                f"   출력 (target output): {tgt_output[:15]}{'...' if len(tgt_output) > 15 else ''}"
-            )
-            self.logger.info(
-                f"   입력 길이: {len(tgt_input)}, 출력 길이: {len(tgt_output)}"
-            )
-
-            # 토큰 매핑 예시 (처음 5개)
-            self.logger.info(f"📝 토큰 매핑 예시:")
-            for i in range(min(5, len(tgt_input))):
-                self.logger.info(
-                    f"   입력[{i}]={tgt_input[i]} → 예측해야할값={tgt_output[i]}"
-                )
-        else:
-            self.logger.info(f"⚠️  Target 시퀀스가 너무 짧음 (길이: {len(tgt_list)})")
-
+        # Teacher Forcing 매핑 예시 (처음 5개)
+        if len(tgt_input_list) > 0 and len(tgt_output_list) > 0:
+            self.logger.info(f"📝 Teacher Forcing 매핑 예시:")
+            max_examples = min(5, len(tgt_input_list), len(tgt_output_list))
+            for i in range(max_examples):
+                input_token = tgt_input_list[i] if i < len(tgt_input_list) else "N/A"
+                output_token = tgt_output_list[i] if i < len(tgt_output_list) else "N/A"
+                self.logger.info(f"   위치[{i}]: 입력={input_token} → 예측해야할값={output_token}")
+        
         # PAD 토큰 통계
         src_pad_count = (src_sample == self.config.PAD_TOKEN).sum().item()
         tgt_pad_count = (tgt_sample == self.config.PAD_TOKEN).sum().item()
+        tgt_input_pad_count = (tgt_input_sample == self.config.PAD_TOKEN).sum().item()
+        tgt_output_pad_count = (tgt_output_sample == self.config.PAD_TOKEN).sum().item()
+        
         self.logger.info(f"📊 PAD 토큰 통계:")
-        self.logger.info(
-            f"   Source PAD: {src_pad_count}/{src_sample.size(0)} ({src_pad_count/src_sample.size(0)*100:.1f}%)"
-        )
-        self.logger.info(
-            f"   Target PAD: {tgt_pad_count}/{tgt_sample.size(0)} ({tgt_pad_count/tgt_sample.size(0)*100:.1f}%)"
-        )
+        self.logger.info(f"   Source PAD: {src_pad_count}/{src_sample.size(0)} ({src_pad_count/src_sample.size(0)*100:.1f}%)")
+        self.logger.info(f"   Target 원본 PAD: {tgt_pad_count}/{tgt_sample.size(0)} ({tgt_pad_count/tgt_sample.size(0)*100:.1f}%)")
+        self.logger.info(f"   Target Input PAD: {tgt_input_pad_count}/{tgt_input_sample.size(0)} ({tgt_input_pad_count/tgt_input_sample.size(0)*100:.1f}%)")
+        self.logger.info(f"   Target Output PAD: {tgt_output_pad_count}/{tgt_output_sample.size(0)} ({tgt_output_pad_count/tgt_output_sample.size(0)*100:.1f}%)")
 
         self.logger.info(f"{'='*60}\n")
 
