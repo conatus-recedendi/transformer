@@ -426,4 +426,4 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
     logger.info(f"  Valid batches: {len(val_loader)}")
     logger.info(f"  Test batches: {len(test_loader)}")
 
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader, vocab

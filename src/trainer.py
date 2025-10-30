@@ -51,6 +51,7 @@ class Trainer:
         self,
         model: nn.Module,
         config: Config,
+        vocab: Any,
         train_loader: DataLoader,
         val_loader: Optional[DataLoader] = None,
         test_loader: Optional[DataLoader] = None,
@@ -177,19 +178,23 @@ class Trainer:
         """Forward step for training"""
         src = batch["src"]  # [batch_size, src_len]
         tgt = batch["tgt"]  # [batch_size, tgt_len] - decoder input (with BOS)
-        
+
         # 데이터 로더에서 제공하는 tgt_y 사용 (target output with EOS)
         if "tgt_y" in batch:
-            tgt_output = batch["tgt_y"]  # [batch_size, tgt_len] - target output (with EOS)
+            tgt_output = batch[
+                "tgt_y"
+            ]  # [batch_size, tgt_len] - target output (with EOS)
             tgt_input = tgt  # decoder input (with BOS, without EOS)
         else:
             # 백워드 호환성: tgt_y가 없으면 기존 방식 사용
             tgt_input = tgt[:, :-1]  # [batch_size, tgt_len-1] - remove last token
-            tgt_output = tgt[:, 1:]   # [batch_size, tgt_len-1] - remove first token
+            tgt_output = tgt[:, 1:]  # [batch_size, tgt_len-1] - remove first token
 
         # 🔍 매 배치마다 첫 번째 샘플 데이터 보여주기
         if self.global_step % 1 == 0:  # 매 배치마다
-            self._debug_batch_sample(src, tgt, tgt_input, tgt_output, batch_idx=self.global_step)
+            self._debug_batch_sample(
+                src, tgt, tgt_input, tgt_output, batch_idx=self.global_step
+            )
 
         # Forward pass through model
         logits = self.model(src, tgt_input)  # [batch_size, tgt_len-1, vocab_size]
@@ -272,6 +277,20 @@ class Trainer:
             f"   PAD 제외: {tgt_output_nonpad[:20]}{'...' if len(tgt_output_nonpad) > 15 else ''}"
         )
 
+        self.logger.info(f"🔍 원본 src 데이터(text):")
+        src_list = src_sample.tolist()
+        src_nonpad = [x for x in src_list if x != self.config.PAD_TOKEN]
+        self.logger.info(
+            f"   전체: {self.vocab.decode(src_list[:20])}{'...' if len(src_list) > 20 else ''}"
+        )
+
+        self.logger.info(f"🔍 target 데이터 (text) :")
+        tgt_list = tgt_sample.tolist()
+        tgt_nonpad = [x for x in tgt_list if x != self.config.PAD_TOKEN]
+        self.logger.info(
+            f"   전체: {self.vocab.decode(tgt_list[:20])}{'...' if len(tgt_list) > 20 else ''}"
+        )
+
         # 특수 토큰 존재 확인
         has_bos_in_input = self.config.BOS_TOKEN in tgt_input_list
         has_eos_in_input = self.config.EOS_TOKEN in tgt_input_list
@@ -280,11 +299,17 @@ class Trainer:
 
         self.logger.info(f"🔍 특수 토큰 분포:")
         self.logger.info(f"   Input에 BOS: {has_bos_in_input}, EOS: {has_eos_in_input}")
-        self.logger.info(f"   Output에 BOS: {has_bos_in_output}, EOS: {has_eos_in_output}")
-        
+        self.logger.info(
+            f"   Output에 BOS: {has_bos_in_output}, EOS: {has_eos_in_output}"
+        )
+
         if len(tgt_input_list) > 0 and len(tgt_output_list) > 0:
-            self.logger.info(f"   Input 첫 토큰: {tgt_input_list[0]}, 마지막 토큰: {tgt_input_list[-1]}")
-            self.logger.info(f"   Output 첫 토큰: {tgt_output_list[0]}, 마지막 토큰: {tgt_output_list[-1]}")
+            self.logger.info(
+                f"   Input 첫 토큰: {tgt_input_list[0]}, 마지막 토큰: {tgt_input_list[-1]}"
+            )
+            self.logger.info(
+                f"   Output 첫 토큰: {tgt_output_list[0]}, 마지막 토큰: {tgt_output_list[-1]}"
+            )
 
         # Teacher Forcing 매핑 예시 (처음 5개)
         if len(tgt_input_list) > 0 and len(tgt_output_list) > 0:
@@ -293,19 +318,29 @@ class Trainer:
             for i in range(max_examples):
                 input_token = tgt_input_list[i] if i < len(tgt_input_list) else "N/A"
                 output_token = tgt_output_list[i] if i < len(tgt_output_list) else "N/A"
-                self.logger.info(f"   위치[{i}]: 입력={input_token} → 예측해야할값={output_token}")
-        
+                self.logger.info(
+                    f"   위치[{i}]: 입력={input_token} → 예측해야할값={output_token}"
+                )
+
         # PAD 토큰 통계
         src_pad_count = (src_sample == self.config.PAD_TOKEN).sum().item()
         tgt_pad_count = (tgt_sample == self.config.PAD_TOKEN).sum().item()
         tgt_input_pad_count = (tgt_input_sample == self.config.PAD_TOKEN).sum().item()
         tgt_output_pad_count = (tgt_output_sample == self.config.PAD_TOKEN).sum().item()
-        
+
         self.logger.info(f"📊 PAD 토큰 통계:")
-        self.logger.info(f"   Source PAD: {src_pad_count}/{src_sample.size(0)} ({src_pad_count/src_sample.size(0)*100:.1f}%)")
-        self.logger.info(f"   Target 원본 PAD: {tgt_pad_count}/{tgt_sample.size(0)} ({tgt_pad_count/tgt_sample.size(0)*100:.1f}%)")
-        self.logger.info(f"   Target Input PAD: {tgt_input_pad_count}/{tgt_input_sample.size(0)} ({tgt_input_pad_count/tgt_input_sample.size(0)*100:.1f}%)")
-        self.logger.info(f"   Target Output PAD: {tgt_output_pad_count}/{tgt_output_sample.size(0)} ({tgt_output_pad_count/tgt_output_sample.size(0)*100:.1f}%)")
+        self.logger.info(
+            f"   Source PAD: {src_pad_count}/{src_sample.size(0)} ({src_pad_count/src_sample.size(0)*100:.1f}%)"
+        )
+        self.logger.info(
+            f"   Target 원본 PAD: {tgt_pad_count}/{tgt_sample.size(0)} ({tgt_pad_count/tgt_sample.size(0)*100:.1f}%)"
+        )
+        self.logger.info(
+            f"   Target Input PAD: {tgt_input_pad_count}/{tgt_input_sample.size(0)} ({tgt_input_pad_count/tgt_input_sample.size(0)*100:.1f}%)"
+        )
+        self.logger.info(
+            f"   Target Output PAD: {tgt_output_pad_count}/{tgt_output_sample.size(0)} ({tgt_output_pad_count/tgt_output_sample.size(0)*100:.1f}%)"
+        )
 
         self.logger.info(f"{'='*60}\n")
 
@@ -476,9 +511,10 @@ class Trainer:
 def create_trainer(
     model: nn.Module,
     config: Config,
+    vocab: Any,
     train_loader: DataLoader,
     val_loader: Optional[DataLoader] = None,
     test_loader: Optional[DataLoader] = None,
 ) -> Trainer:
     """Factory function to create trainer"""
-    return Trainer(model, config, train_loader, val_loader, test_loader)
+    return Trainer(model, config, vocab, train_loader, val_loader, test_loader)

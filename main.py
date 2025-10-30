@@ -289,7 +289,7 @@ def main():
         print(f"  {key}: {value}")
 
     # Load data
-    train_loader, val_loader, test_loader = load_data(
+    train_loader, val_loader, test_loader, vocab = load_data(
         config, use_dummy=args.use_dummy_data
     )
 
@@ -301,6 +301,7 @@ def main():
     trainer = create_trainer(
         model=model,
         config=config,
+        vocab=vocab,
         train_loader=train_loader,
         val_loader=val_loader,
         test_loader=test_loader,

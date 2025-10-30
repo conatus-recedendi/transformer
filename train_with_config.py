@@ -130,7 +130,7 @@ def load_config_from_json(config_path: str) -> Config:
 def load_data(config: Config, use_dummy: bool = True):
     """Load training, validation, and test data"""
     logger = logging.getLogger(__name__)
-
+    vocab = None
     if use_dummy:
         # Use dummy data for testing
         logger.info("🔄 Loading dummy data...")
@@ -221,7 +221,7 @@ def load_data(config: Config, use_dummy: bool = True):
             if not hasattr(config, "DATASET"):
                 config.DATASET = "wmt14_en_de"
 
-            train_loader, val_loader, test_loader = load_real_wmt_data(config)
+            train_loader, val_loader, test_loader, vocab = load_real_wmt_data(config)
 
             if train_loader is None:
                 logger.error("❌ Failed to load real data. Check if data files exist:")
@@ -243,7 +243,7 @@ def load_data(config: Config, use_dummy: bool = True):
     logger.info(f"Val batches: {len(val_loader)}")
     logger.info(f"Test batches: {len(test_loader)}")
 
-    return train_loader, val_loader, test_loader
+    return train_loader, val_loader, test_loader, vocab
 
 
 def create_model_from_config(config: Config) -> torch.nn.Module:
@@ -409,7 +409,7 @@ def main():
     logger.info("=" * 60)
 
     # Load data
-    train_loader, val_loader, test_loader = load_data(
+    train_loader, val_loader, test_loader, vocab = load_data(
         config, use_dummy=args.use_dummy_data
     )
 
@@ -425,6 +425,7 @@ def main():
     trainer = create_trainer(
         model=model,
         config=config,
+        vocab=vocab,
         train_loader=train_loader,
         val_loader=val_loader,
         test_loader=test_loader,
