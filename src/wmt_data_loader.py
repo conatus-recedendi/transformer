@@ -184,6 +184,7 @@ class WMTDataset(Dataset):
         tgt_ids = self.tgt_vocab.encode(tgt_tokens)
 
         # BOS/EOS 토큰 추가
+        src_ids = src_ids + [self.src_vocab.special_tokens["<EOS>"]]
         tgt_input = [self.tgt_vocab.special_tokens["<BOS>"]] + tgt_ids
         tgt_output = tgt_ids + [self.tgt_vocab.special_tokens["<EOS>"]]
 
