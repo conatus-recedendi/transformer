@@ -66,6 +66,7 @@ class Trainer:
         """
         self.model = model
         self.config = config
+        self.vocab = vocab
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
