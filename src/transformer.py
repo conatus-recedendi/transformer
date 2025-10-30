@@ -346,7 +346,7 @@ class Transformer(nn.Module):
         tgt_len = tgt.size(1)
         tgt_mask = create_causal_mask(tgt_len, device=tgt.device)
 
-        src = self.embedding(src) * math.
+        src = self.embedding(src) * math.sqrt(
             self.d_model
         )  # [batch_size, src_len, d_model] Input embedding with scaling
         # Add positional encoding

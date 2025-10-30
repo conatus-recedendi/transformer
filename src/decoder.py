@@ -93,9 +93,9 @@ class DecoderLayer(nn.Module):
 
         # 2. Multi-head cross-attention with residual connection and layer norm
         cross_attn_output, _ = self.cross_attn(
-            encoder_output
             encoder_output,
-            v,
+            encoder_output,
+            x,
             key_padding_mask=memory_key_padding_mask,
             attn_mask=memory_mask,
         )
