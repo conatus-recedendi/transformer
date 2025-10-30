@@ -397,7 +397,7 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.BATCH_SIZE,
-        shuffle=True,
+        shuffle=False,
         collate_fn=lambda batch: collate_fn_real(batch, config.PAD_TOKEN),
         num_workers=0,
         pin_memory=True,
