@@ -275,6 +275,7 @@ def create_model_from_config(config: Config) -> torch.nn.Module:
         tie_weights=False,  # Tie embedding and output projection weights
         kdim=config.KDIM,
         vdim=config.VDIM,
+        device=config.DEVICE,
     )
 
     return model

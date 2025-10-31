@@ -25,6 +25,7 @@ class Transformer(nn.Module):
         tie_weights=True,
         kdim=64,
         vdim=64,
+        device="cpu",
     ):
         """
         Args:
@@ -55,7 +56,7 @@ class Transformer(nn.Module):
         self.embedding = nn.Embedding(src_vocab_size, d_model, padding_idx=pad_token_id)
 
         # Positional encoding
-        self.pos_encoding = PositionalEncoding(d_model, max_seq_length)
+        self.pos_encoding = PositionalEncoding(d_model, max_seq_length, device=device)
 
         # Encoder
         self.encoder = Encoder(
