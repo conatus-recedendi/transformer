@@ -86,7 +86,9 @@ class Transformer(nn.Module):
         )
 
         # Output projection layer
-        self.output_projection = nn.Linear(d_model, tgt_vocab_size, bias=False)
+        self.output_projection = nn.Embedding(
+            src_vocab_size, d_model, padding_idx=pad_token_id
+        )
 
         # Optionally tie decoder embedding weights with output projection
         if tie_weights:
@@ -98,11 +100,13 @@ class Transformer(nn.Module):
     def _initialize_weights(self):
         """Initialize all parameters with uniform distribution U[-0.1, 0.1]"""
         # Initialize embedding layer
-        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
+        nn.init.normal_(self.embedding.weight, mean=0.0, std=self.d_model**-0.5)
 
         # Initialize output projection if not tied
         if not self.tie_weights:
-            nn.init.uniform_(self.output_projection.weight, -0.1, 0.1)
+            nn.init.normal_(
+                self.output_projection.weight, mean=0.0, std=self.d_model**-0.5
+            )
 
         print(
             f"Transformer: Initialized embedding and output projection with U[-0.1, 0.1]"
@@ -171,6 +175,7 @@ class Transformer(nn.Module):
         )
 
         # Output projection to vocabulary
+        # output = self.output_projection(decoder_output)
         output = self.output_projection(decoder_output)
 
         return output
