@@ -37,7 +37,7 @@ class DecoderLayer(nn.Module):
         self.ffn = nn.Sequential(
             nn.Linear(d_model, d_ff),
             nn.ReLU(),
-            nn.Dropout(dropout),
+            # nn.Dropout(dropout),
             nn.Linear(d_ff, d_model),
         )
 
