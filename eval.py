@@ -415,6 +415,10 @@ class ModelEvaluator:
                     src_seq = src[i : i + 1]  # [1, src_len]
                     tgt_seq = tgt_y[i]  # [tgt_len]
 
+                    # 🔍 디버깅: 각 배치의 첫 번째 문장 상세 정보 출력
+                    if i == 0:  # 각 배치의 첫 번째 문장만
+                        self._debug_batch_sample(batch_idx, src_seq, tgt_seq, vocab)
+
                     # Create source mask (ignore padding)
                     src_mask = (src_seq != self.config.PAD_TOKEN).unsqueeze(
                         1
@@ -434,9 +438,11 @@ class ModelEvaluator:
                             pad_token=self.config.PAD_TOKEN,
                         )
 
-                        # Debug: log raw prediction tokens
-                        if batch_idx == 0 and i == 0:  # First example only
-                            self.logger.info(f"Raw pred_tokens: {pred_tokens}")
+                        # 🔍 디버깅: 첫 번째 문장의 예측 결과 상세 정보
+                        if i == 0:
+                            self._debug_prediction_result(
+                                batch_idx, pred_tokens, tgt_seq, vocab
+                            )
 
                     except Exception as e:
                         self.logger.warning(
@@ -465,11 +471,6 @@ class ModelEvaluator:
                             self.config.PAD_TOKEN,
                         ]
                     ]
-
-                    # Debug: log cleaned tokens
-                    if batch_idx == 0 and i == 0:  # First example only
-                        self.logger.info(f"Cleaned pred_tokens: {pred_tokens_clean}")
-                        self.logger.info(f"Cleaned ref_tokens: {ref_tokens}")
 
                     # Convert to text using vocabulary
                     try:
@@ -506,13 +507,8 @@ class ModelEvaluator:
 
                     except Exception as e:
                         self.logger.warning(f"Error in vocabulary decoding: {e}")
-                        pred_words = [">"]
+                        pred_words = ["<UNK>"]
                         ref_words = ["<UNK>"]
-
-                    # Debug: log final words
-                    if batch_idx == 0 and i == 0:  # First example only
-                        self.logger.info(f"Final pred_words: {pred_words}")
-                        self.logger.info(f"Final ref_words: {ref_words}")
 
                     all_predictions.append(pred_words)
                     all_references.append(ref_words)
@@ -553,6 +549,163 @@ class ModelEvaluator:
         results = {"bleu_score": bleu_score, "num_examples": len(all_predictions)}
 
         return results
+
+    def _debug_batch_sample(self, batch_idx, src_seq, tgt_seq, vocab):
+        """각 배치의 첫 번째 문장에 대한 상세 디버깅 정보 출력"""
+        if batch_idx >= 10:  # 처음 10배치만
+            return
+
+        self.logger.info(f"\n{'='*80}")
+        self.logger.info(f"🔍 BATCH {batch_idx} - EVALUATION DEBUG")
+        self.logger.info(f"{'='*80}")
+
+        # 원본 토큰 정보
+        src_tokens = src_seq[0].cpu().tolist()  # [src_len]
+        tgt_tokens = tgt_seq.cpu().tolist()  # [tgt_len]
+
+        # PAD 토큰 제거
+        src_tokens_clean = [t for t in src_tokens if t != self.config.PAD_TOKEN]
+        tgt_tokens_clean = [
+            t
+            for t in tgt_tokens
+            if t
+            not in [self.config.PAD_TOKEN, self.config.BOS_TOKEN, self.config.EOS_TOKEN]
+        ]
+
+        self.logger.info(f"📤 Source (원본 입력):")
+        self.logger.info(
+            f"   토큰 ID: {src_tokens_clean[:20]}{'...' if len(src_tokens_clean) > 20 else ''}"
+        )
+
+        # 텍스트 변환
+        try:
+            if hasattr(vocab, "decode"):
+                src_text = vocab.decode(src_tokens_clean)
+                tgt_text = vocab.decode(tgt_tokens_clean)
+            else:
+                src_text = " ".join([str(t) for t in src_tokens_clean])
+                tgt_text = " ".join([str(t) for t in tgt_tokens_clean])
+
+            self.logger.info(f"   텍스트: '{src_text}'")
+
+        except Exception as e:
+            self.logger.warning(f"   텍스트 변환 실패: {e}")
+            src_text = "<변환실패>"
+            tgt_text = "<변환실패>"
+
+        self.logger.info(f"📥 Target (예상 출력):")
+        self.logger.info(
+            f"   토큰 ID: {tgt_tokens_clean[:20]}{'...' if len(tgt_tokens_clean) > 20 else ''}"
+        )
+        self.logger.info(f"   텍스트: '{tgt_text}'")
+
+        self.logger.info(
+            f"🏷️  특수 토큰: PAD={self.config.PAD_TOKEN}, BOS={self.config.BOS_TOKEN}, EOS={self.config.EOS_TOKEN}"
+        )
+        self.logger.info(
+            f"📊 길이 정보: Source={len(src_tokens_clean)}, Target={len(tgt_tokens_clean)}"
+        )
+
+    def _debug_prediction_result(self, batch_idx, pred_tokens, tgt_seq, vocab):
+        """예측 결과에 대한 상세 디버깅 정보 출력"""
+        if batch_idx >= 10:  # 처음 10배치만
+            return
+
+        # 예측 토큰 정리
+        pred_tokens_clean = [
+            t
+            for t in pred_tokens
+            if t
+            not in [self.config.BOS_TOKEN, self.config.EOS_TOKEN, self.config.PAD_TOKEN]
+        ]
+
+        # 타겟 토큰 정리
+        tgt_tokens = tgt_seq.cpu().tolist()
+        tgt_tokens_clean = [
+            t
+            for t in tgt_tokens
+            if t
+            not in [self.config.PAD_TOKEN, self.config.BOS_TOKEN, self.config.EOS_TOKEN]
+        ]
+
+        self.logger.info(f"🤖 Prediction (실제 예측):")
+        self.logger.info(f"   원본 예측: {pred_tokens}")
+        self.logger.info(
+            f"   정제된 토큰: {pred_tokens_clean[:20]}{'...' if len(pred_tokens_clean) > 20 else ''}"
+        )
+
+        # 텍스트 변환
+        try:
+            if hasattr(vocab, "decode"):
+                pred_text = (
+                    vocab.decode(pred_tokens_clean) if pred_tokens_clean else "<EMPTY>"
+                )
+                tgt_text = (
+                    vocab.decode(tgt_tokens_clean) if tgt_tokens_clean else "<EMPTY>"
+                )
+            else:
+                pred_text = (
+                    " ".join([str(t) for t in pred_tokens_clean])
+                    if pred_tokens_clean
+                    else "<EMPTY>"
+                )
+                tgt_text = (
+                    " ".join([str(t) for t in tgt_tokens_clean])
+                    if tgt_tokens_clean
+                    else "<EMPTY>"
+                )
+
+            self.logger.info(f"   예측 텍스트: '{pred_text}'")
+
+        except Exception as e:
+            self.logger.warning(f"   예측 텍스트 변환 실패: {e}")
+            pred_text = "<변환실패>"
+            tgt_text = "<변환실패>"
+
+        # 토큰 레벨 비교 (처음 10개)
+        self.logger.info(f"🔄 토큰 비교 (처음 10개):")
+        max_compare = min(10, max(len(pred_tokens_clean), len(tgt_tokens_clean)))
+
+        for j in range(max_compare):
+            pred_token = pred_tokens_clean[j] if j < len(pred_tokens_clean) else "<PAD>"
+            tgt_token = tgt_tokens_clean[j] if j < len(tgt_tokens_clean) else "<PAD>"
+
+            match_symbol = "✅" if pred_token == tgt_token else "❌"
+
+            # 개별 토큰 텍스트 변환
+            try:
+                if (
+                    hasattr(vocab, "decode")
+                    and isinstance(pred_token, int)
+                    and isinstance(tgt_token, int)
+                ):
+                    pred_word = (
+                        vocab.decode([pred_token]) if pred_token != "<PAD>" else "<PAD>"
+                    )
+                    tgt_word = (
+                        vocab.decode([tgt_token]) if tgt_token != "<PAD>" else "<PAD>"
+                    )
+                else:
+                    pred_word = str(pred_token)
+                    tgt_word = str(tgt_token)
+            except:
+                pred_word = str(pred_token)
+                tgt_word = str(tgt_token)
+
+            self.logger.info(
+                f"   [{j:2d}] {match_symbol} 예측:{pred_token:>6}('{pred_word}') vs 정답:{tgt_token:>6}('{tgt_word}')"
+            )
+
+        # 길이 비교
+        self.logger.info(
+            f"📏 길이 비교: 예측={len(pred_tokens_clean)}, 정답={len(tgt_tokens_clean)}"
+        )
+
+        # 전체 텍스트 비교
+        self.logger.info(f"📝 전체 비교:")
+        self.logger.info(f"   정답: '{tgt_text}'")
+        self.logger.info(f"   예측: '{pred_text}'")
+        self.logger.info(f"{'='*80}\n")
 
 
 def main():
