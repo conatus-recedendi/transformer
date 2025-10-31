@@ -245,7 +245,11 @@ class Trainer:
 
         # Calculate loss
         logits_flat = logits.reshape(-1, logits.size(-1))  # [batch*seq, vocab_size]
+        # First logits
+        self.logger.info(f"Logits sample: {logits_flat[0][:10].detach().cpu().numpy()}")
+
         tgt_flat = tgt_output.reshape(-1)  # [batch*seq]
+        self.logger.info(f"Target sample: {tgt_flat[0:10].detach().cpu().numpy()}")
 
         loss = self.criterion(logits_flat, tgt_flat)
         return loss
