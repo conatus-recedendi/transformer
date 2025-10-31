@@ -223,41 +223,41 @@ class Trainer:
         # TODO: remove
         # 🔍 첫 번째 시퀀스 위치의 logits 분석
         # if logits_flat.size(0) > 0 and tgt_flat.size(0) > 0:
-            first_logits = logits_flat[0]  # [vocab_size] - 첫 번째 위치의 logits
-            first_target = tgt_flat[0].item()  # 첫 번째 위치의 정답 토큰
+        #     first_logits = logits_flat[0]  # [vocab_size] - 첫 번째 위치의 logits
+        #     first_target = tgt_flat[0].item()  # 첫 번째 위치의 정답 토큰
 
-            # 가장 큰 logit 찾기
-            max_logit_value, max_logit_idx = torch.max(first_logits, dim=0)
+        #     # 가장 큰 logit 찾기
+        #     max_logit_value, max_logit_idx = torch.max(first_logits, dim=0)
 
-            # 정답 토큰의 logit값
-            if 0 <= first_target < first_logits.size(0):
-                target_logit_value = first_logits[first_target]
+        #     # 정답 토큰의 logit값
+        #     if 0 <= first_target < first_logits.size(0):
+        #         target_logit_value = first_logits[first_target]
 
-                self.logger.info(f"📊 첫 번째 위치 Logits 분석:")
-                self.logger.info(
-                    f"   정답 토큰 {first_target}: logit = {target_logit_value:.4f}"
-                )
-                self.logger.info(
-                    f"   최대 logit 토큰 {max_logit_idx.item()}: logit = {max_logit_value:.4f}"
-                )
-                self.logger.info(f"   차이: {max_logit_value - target_logit_value:.4f}")
+        #         self.logger.info(f"📊 첫 번째 위치 Logits 분석:")
+        #         self.logger.info(
+        #             f"   정답 토큰 {first_target}: logit = {target_logit_value:.4f}"
+        #         )
+        #         self.logger.info(
+        #             f"   최대 logit 토큰 {max_logit_idx.item()}: logit = {max_logit_value:.4f}"
+        #         )
+        #         self.logger.info(f"   차이: {max_logit_value - target_logit_value:.4f}")
 
-                # 상위 5개 logit값들
-                top5_values, top5_indices = torch.topk(first_logits, 5)
-                self.logger.info(
-                    f"   Top-5 logits: {[(idx.item(), val.item()) for idx, val in zip(top5_indices, top5_values)]}"
-                )
+        #         # 상위 5개 logit값들
+        #         top5_values, top5_indices = torch.topk(first_logits, 5)
+        #         self.logger.info(
+        #             f"   Top-5 logits: {[(idx.item(), val.item()) for idx, val in zip(top5_indices, top5_values)]}"
+        #         )
 
-                # 정답이 상위 몇 번째인지
-                sorted_indices = torch.argsort(first_logits, descending=True)
-                target_rank = (sorted_indices == first_target).nonzero(as_tuple=True)[
-                    0
-                ].item() + 1
-                self.logger.info(
-                    f"   정답 토큰 순위: {target_rank}/{first_logits.size(0)}"
-                )
-            else:
-                self.logger.info(f"⚠️  잘못된 정답 토큰 인덱스: {first_target}")
+        #         # 정답이 상위 몇 번째인지
+        #         sorted_indices = torch.argsort(first_logits, descending=True)
+        #         target_rank = (sorted_indices == first_target).nonzero(as_tuple=True)[
+        #             0
+        #         ].item() + 1
+        #         self.logger.info(
+        #             f"   정답 토큰 순위: {target_rank}/{first_logits.size(0)}"
+        #         )
+        #     else:
+        #         self.logger.info(f"⚠️  잘못된 정답 토큰 인덱스: {first_target}")
 
         loss = self.criterion(logits_flat, tgt_flat)
         return loss
