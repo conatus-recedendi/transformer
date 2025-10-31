@@ -274,7 +274,7 @@ def create_causal_mask(seq_len, device=None):
     Returns:
         mask: [seq_len, seq_len] - True for masked, False for allowed positions
     """
-    mask = torch.triu(torch.ones(seq_len, seq_len, device=device))
+    mask = torch.triu(torch.ones(seq_len, seq_len, device=device), diagonal=1)
     return mask.bool()  # False = masked positions
 
 
