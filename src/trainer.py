@@ -17,43 +17,6 @@ from .config import Config
 from .utils import save_checkpoint, load_checkpoint, warmup_lr_schedule
 
 
-class LabelSmoothingLoss(nn.Module):
-    """Label Smoothing Loss (논문에서 사용)"""
-
-    def __init__(
-        self, num_classes: int, smoothing: float = 0.1, ignore_index: int = -100
-    ):
-        super().__init__()
-        self.num_classes = num_classes
-        self.smoothing = smoothing
-        self.ignore_index = ignore_index
-        self.confidence = 1.0 - smoothing
-
-    def forward(self, pred, target):
-        """
-        Args:
-            pred: [N, C] where C = number of classes
-            target: [N] where each value is 0 <= target[i] <= C-1
-        """
-        pred = pred.log_softmax(dim=-1)
-
-        # Create one-hot encoding
-        true_dist = torch.zeros_like(pred)
-        true_dist.fill_(self.smoothing / (self.num_classes - 1))
-
-        # Mask for ignore_index
-        mask = target != self.ignore_index
-        target_masked = target.masked_fill(~mask, 0)
-
-        true_dist.scatter_(1, target_masked.unsqueeze(1), self.confidence)
-
-        # Apply mask to both prediction and target
-        pred_masked = pred * mask.unsqueeze(1).float()
-        true_dist_masked = true_dist * mask.unsqueeze(1).float()
-
-        return torch.sum(-true_dist_masked * pred_masked) / mask.sum().float()
-
-
 class LRScheduler:
     """Learning rate scheduler for Transformer (Warmup + Decay)"""
 
@@ -132,7 +95,17 @@ class Trainer:
             self.optimizer, config.MODEL_DIM, config.WARMUP_STEPS, config.BATCH_SIZE
         )
 
-        self.criterion = nn.CrossEntropyLoss(ignore_index=config.PAD_TOKEN)
+        # Loss function 설정 - PyTorch CrossEntropyLoss with optional label smoothing
+        if hasattr(config, "LABEL_SMOOTHING") and config.LABEL_SMOOTHING > 0:
+            self.criterion = nn.CrossEntropyLoss(
+                ignore_index=config.PAD_TOKEN, label_smoothing=config.LABEL_SMOOTHING
+            )
+            print(
+                f"Using CrossEntropyLoss with label_smoothing={config.LABEL_SMOOTHING}"
+            )
+        else:
+            self.criterion = nn.CrossEntropyLoss(ignore_index=config.PAD_TOKEN)
+            print("Using standard CrossEntropyLoss")
 
         # Training state
         self.current_epoch = 0
@@ -247,6 +220,7 @@ class Trainer:
         logits_flat = logits.reshape(-1, logits.size(-1))  # [batch*seq, vocab_size]
         tgt_flat = tgt_output.reshape(-1)  # [batch*seq]
 
+        # TODO: remove
         # 🔍 첫 번째 시퀀스 위치의 logits 분석
         if logits_flat.size(0) > 0 and tgt_flat.size(0) > 0:
             first_logits = logits_flat[0]  # [vocab_size] - 첫 번째 위치의 logits

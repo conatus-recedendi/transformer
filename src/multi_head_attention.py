@@ -160,12 +160,9 @@ class MultiheadAttention(nn.Module):
         # Compute attention weights
         attn_weights = torch.softmax(scores, dim=-1)
 
-        # Apply dropout
-        attn_weights = self.dropout_layer(attn_weights)
-
         # Apply attention to values
+        attn_output = torch.matmul(attn_weights, V)
         # [batch_size, num_heads, tgt_len, src_len] x [batch_size, num_heads, src_len, vdim]
         # -> [batch_size, num_heads, tgt_len, vdim]
-        attn_output = torch.matmul(attn_weights, V)
 
         return attn_output, attn_weights

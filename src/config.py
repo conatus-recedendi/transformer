@@ -34,6 +34,9 @@ class Config:
         self.MAX_TOKENS_PER_BATCH = 25000
         self.ACCUMULATE_GRAD_BATCHES = 1
 
+        # Loss function parameters
+        self.LABEL_SMOOTHING = 0.1  # Label smoothing factor (논문에서 사용한 값)
+
         # Data parameters (matching data section in JSON)
         self.DATASET = "wmt14_en_de"
         self.VOCAB_SIZE = 37000
@@ -116,6 +119,7 @@ class Config:
                 "tokens_per_batch": self.TOKENS_PER_BATCH,
                 "max_tokens_per_batch": self.MAX_TOKENS_PER_BATCH,
                 "accumulate_grad_batches": self.ACCUMULATE_GRAD_BATCHES,
+                "label_smoothing": self.LABEL_SMOOTHING,
             },
             "data": {
                 "dataset": self.DATASET,
@@ -192,6 +196,9 @@ class Config:
             )
             config.ACCUMULATE_GRAD_BATCHES = training.get(
                 "accumulate_grad_batches", config.ACCUMULATE_GRAD_BATCHES
+            )
+            config.LABEL_SMOOTHING = training.get(
+                "label_smoothing", config.LABEL_SMOOTHING
             )
 
         # Data parameters
