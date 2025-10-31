@@ -47,6 +47,8 @@ class Transformer(nn.Module):
         self.d_model = d_model
         self.pad_token_id = pad_token_id
         self.tie_weights = tie_weights
+        self.vdim = vdim
+        self.kdim = kdim
 
         # Input embedding
         # src_vocab_size alwasy equals tgt_vocab_size. bcz of shared BPE
@@ -147,7 +149,7 @@ class Transformer(nn.Module):
             tgt_mask = create_causal_mask(tgt_len, device=tgt.device)
 
         x = self.embedding(src) * math.sqrt(
-            self.d_model
+            self.vdim
         )  # [batch_size, src_len, d_model] Input embedding with scaling
         x = self.pos_encoding(x)
         # Encoder forward pass
@@ -155,7 +157,7 @@ class Transformer(nn.Module):
             x, src_mask=src_mask, src_key_padding_mask=src_key_padding_mask
         )
         y = self.embedding(tgt) * math.sqrt(
-            self.d_model
+            self.vdim
         )  # [batch_size, tgt_len, d_model] Input embedding with scaling
         y = self.pos_encoding(y)
         # Decoder forward pass
