@@ -111,17 +111,13 @@ class MultiheadAttention(nn.Module):
         assert embed_dim % num_heads == 0, "embed_dim must be divisible by num_heads"
         self.head_dim = embed_dim // num_heads
 
-        # 각 head의 kdim과 vdim (전체를 head 수로 나눔)
-        self.head_kdim = self.kdim // num_heads
-        self.head_vdim = self.vdim // num_heads
-
         # Create multiple single head attention modules
         self.heads = nn.ModuleList(
             [
                 SingleHeadAttention(
                     embed_dim=embed_dim,
-                    kdim=self.head_kdim,
-                    vdim=self.head_vdim,
+                    kdim=self.kdim,
+                    vdim=self.vdim,
                     dropout=dropout,
                     bias=bias,
                 )
@@ -130,7 +126,7 @@ class MultiheadAttention(nn.Module):
         )
 
         # Output projection
-        self.out_linear = nn.Linear(self.vdim, embed_dim, bias=bias)
+        self.out_linear = nn.Linear(self.vdim * self.num_heads, embed_dim, bias=bias)
 
         # Dropout layer
         self.dropout_layer = nn.Dropout(dropout)
