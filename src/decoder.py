@@ -42,9 +42,9 @@ class DecoderLayer(nn.Module):
         )
 
         # Layer normalization
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
-        self.norm3 = nn.LayerNorm(d_model)
+        self.norm1 = nn.LayerNorm(d_model, eps=1e-6)
+        self.norm2 = nn.LayerNorm(d_model, eps=1e-6)
+        self.norm3 = nn.LayerNorm(d_model, eps=1e-6)
 
         # Dropout
         self.dropout = nn.Dropout(dropout)
@@ -56,14 +56,9 @@ class DecoderLayer(nn.Module):
         """Initialize all parameters with uniform distribution U[-0.1, 0.1]"""
         for module in self.ffn:
             if isinstance(module, nn.Linear):
-                nn.init.uniform_(module.weight, -0.1, 0.1)
+                nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
-                    nn.init.uniform_(module.bias, -0.1, 0.1)
-
-        # LayerNorm parameters
-        for module in [self.norm1, self.norm2, self.norm3]:
-            nn.init.uniform_(module.weight, -0.1, 0.1)
-            nn.init.uniform_(module.bias, -0.1, 0.1)
+                    nn.init.zeros_(module.bias)
 
     def forward(
         self,
@@ -155,7 +150,7 @@ class Decoder(nn.Module):
         )
 
         # Final layer normalization
-        self.norm = nn.LayerNorm(d_model)
+        # self.norm = nn.LayerNorm(d_model)
 
         # Initialize weights
         self._initialize_weights()
@@ -166,8 +161,8 @@ class Decoder(nn.Module):
         # nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
 
         # Initialize final layer norm
-        nn.init.uniform_(self.norm.weight, -0.1, 0.1)
-        nn.init.uniform_(self.norm.bias, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.weight, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.bias, -0.1, 0.1)
 
         # print(f"Decoder: Initialized all parameters with U[-0.1, 0.1]")
 
@@ -209,7 +204,7 @@ class Decoder(nn.Module):
             )
 
         # Final layer normalization
-        x = self.norm(x)
+        # x = self.norm(x)
 
         return x
 

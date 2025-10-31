@@ -31,8 +31,8 @@ class EncoderLayer(nn.Module):
         )
 
         # Layer normalization
-        self.norm1 = nn.LayerNorm(d_model)
-        self.norm2 = nn.LayerNorm(d_model)
+        self.norm1 = nn.LayerNorm(d_model, eps=1e-6)
+        self.norm2 = nn.LayerNorm(d_model, eps=1e-6)
 
         # Dropout
         self.dropout = nn.Dropout(dropout)
@@ -44,14 +44,9 @@ class EncoderLayer(nn.Module):
         """Initialize all parameters with uniform distribution U[-0.1, 0.1]"""
         for module in self.ffn:
             if isinstance(module, nn.Linear):
-                nn.init.uniform_(module.weight, -0.1, 0.1)
+                nn.init.xavier_uniform_(module.weight)
                 if module.bias is not None:
-                    nn.init.uniform_(module.bias, -0.1, 0.1)
-
-        # LayerNorm parameters
-        for module in [self.norm1, self.norm2]:
-            nn.init.uniform_(module.weight, -0.1, 0.1)
-            nn.init.uniform_(module.bias, -0.1, 0.1)
+                    nn.init.zeros_(module.bias)
 
     def forward(self, x, src_mask=None, src_key_padding_mask=None):
         """
@@ -124,7 +119,7 @@ class Encoder(nn.Module):
         )
 
         # Final layer normalization
-        self.norm = nn.LayerNorm(d_model)
+        # self.norm = nn.LayerNorm(d_model, eps=1e-6)
 
         # Initialize weights
         self._initialize_weights()
@@ -135,8 +130,8 @@ class Encoder(nn.Module):
         # nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
 
         # Initialize final layer norm
-        nn.init.uniform_(self.norm.weight, -0.1, 0.1)
-        nn.init.uniform_(self.norm.bias, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.weight, -0.1, 0.1)
+        # nn.init.uniform_(self.norm.bias, -0.1, 0.1)
 
         # print(f"Encoder: Initialized all parameters with U[-0.1, 0.1]")
 
@@ -159,8 +154,8 @@ class Encoder(nn.Module):
         for layer in self.layers:
             x = layer(x, src_mask, src_key_padding_mask)
 
-        # Final layer normalization
-        x = self.norm(x)  # TODO: is it necessary?
+        # # Final layer normalization
+        # x = self.norm(x)  # TODO: is it necessary?
 
         return x
 
