@@ -17,18 +17,60 @@ from .config import Config
 from .utils import save_checkpoint, load_checkpoint, warmup_lr_schedule
 
 
+class LabelSmoothingLoss(nn.Module):
+    """Label Smoothing Loss (논문에서 사용)"""
+
+    def __init__(
+        self, num_classes: int, smoothing: float = 0.1, ignore_index: int = -100
+    ):
+        super().__init__()
+        self.num_classes = num_classes
+        self.smoothing = smoothing
+        self.ignore_index = ignore_index
+        self.confidence = 1.0 - smoothing
+
+    def forward(self, pred, target):
+        """
+        Args:
+            pred: [N, C] where C = number of classes
+            target: [N] where each value is 0 <= target[i] <= C-1
+        """
+        pred = pred.log_softmax(dim=-1)
+
+        # Create one-hot encoding
+        true_dist = torch.zeros_like(pred)
+        true_dist.fill_(self.smoothing / (self.num_classes - 1))
+
+        # Mask for ignore_index
+        mask = target != self.ignore_index
+        target_masked = target.masked_fill(~mask, 0)
+
+        true_dist.scatter_(1, target_masked.unsqueeze(1), self.confidence)
+
+        # Apply mask to both prediction and target
+        pred_masked = pred * mask.unsqueeze(1).float()
+        true_dist_masked = true_dist * mask.unsqueeze(1).float()
+
+        return torch.sum(-true_dist_masked * pred_masked) / mask.sum().float()
+
+
 class LRScheduler:
     """Learning rate scheduler for Transformer (Warmup + Decay)"""
 
-    def __init__(self, optimizer, d_model: int, warmup_steps: int = 4000):
+    def __init__(
+        self, optimizer, d_model: int, warmup_steps: int = 4000, batch_size=128
+    ):
         self.optimizer = optimizer
         self.d_model = d_model
         self.warmup_steps = warmup_steps
         self.step_num = 0
+        self.batch_size = batch_size
 
     def step(self):
         """Update learning rate"""
-        self.step_num += 1
+        self.step_num += 1 / (
+            self.batch_size / 128
+        )  # step num added by batch_size /128
         lr = self._calculate_lr()
 
         for param_group in self.optimizer.param_groups:
@@ -77,20 +119,30 @@ class Trainer:
         )
         self.model.to(self.device)
 
-        # Setup optimizer and scheduler
+        # Setup optimizer and scheduler (논문의 정확한 설정)
+        # 초기 learning rate는 0으로 설정하고 scheduler가 관리
         self.optimizer = optim.Adam(
             self.model.parameters(),
-            lr=config.LEARNING_RATE,
+            lr=1e-8,  # 매우 작은 초기값, scheduler가 실제 lr 관리
             betas=(0.9, 0.98),
             eps=1e-9,
         )
 
         self.scheduler = LRScheduler(
-            self.optimizer, config.MODEL_DIM, config.WARMUP_STEPS
+            self.optimizer, config.MODEL_DIM, config.WARMUP_STEPS, config.BATCH_SIZE
         )
 
-        # Setup loss function
-        self.criterion = nn.CrossEntropyLoss(ignore_index=config.PAD_TOKEN)
+        # Setup loss function with label smoothing
+        label_smoothing = getattr(config, "LABEL_SMOOTHING", 0.0)
+        if label_smoothing > 0:
+            self.criterion = LabelSmoothingLoss(
+                num_classes=config.VOCAB_SIZE,
+                smoothing=label_smoothing,
+                ignore_index=config.PAD_TOKEN,
+            )
+            self.logger.info(f"Using Label Smoothing: {label_smoothing}")
+        else:
+            self.criterion = nn.CrossEntropyLoss(ignore_index=config.PAD_TOKEN)
 
         # Training state
         self.current_epoch = 0
@@ -135,6 +187,7 @@ class Trainer:
             }
 
             # Forward pass
+            self.scheduler.step()
             loss = self._forward_step(batch)
 
             # Backward pass
@@ -148,7 +201,6 @@ class Trainer:
 
             # Update parameters
             self.optimizer.step()
-            self.scheduler.step()
 
             # Update metrics
             total_loss += loss.item()
@@ -513,6 +565,9 @@ class Trainer:
         """모델 출력 토큰 디버깅"""
         self.logger.info(f"\n{'🤖'*20}")
         self.logger.info(f"🔍 MODEL OUTPUT DEBUG - Step {self.global_step}")
+        self.logger.info(
+            f"📈 Current Learning Rate: {self.optimizer.param_groups[0]['lr']:.2e}"
+        )
         self.logger.info(f"{'🤖'*20}")
 
         with torch.no_grad():
