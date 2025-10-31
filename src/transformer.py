@@ -55,7 +55,7 @@ class Transformer(nn.Module):
         self.embedding = nn.Embedding(src_vocab_size, d_model, padding_idx=pad_token_id)
 
         # Positional encoding
-        self.pos_encoding = PositionalEncoding(d_model, max_seq_length, dropout)
+        self.pos_encoding = PositionalEncoding(d_model, max_seq_length)
 
         # Encoder
         self.encoder = Encoder(
@@ -85,6 +85,7 @@ class Transformer(nn.Module):
             vdim=vdim,
         )
 
+        self.dropout = nn.Dropout(dropout)
         # Output projection layer
         self.output_projection = nn.Linear(d_model, tgt_vocab_size, bias=False)
 
@@ -152,6 +153,7 @@ class Transformer(nn.Module):
             self.d_model
         )  # [batch_size, src_len, d_model] Input embedding with scaling
         x += self.pos_encoding(src)
+        x = self.dropout(x)
         # Encoder forward pass
         encoder_output = self.encoder(
             x, src_mask=src_mask, src_key_padding_mask=src_key_padding_mask
@@ -160,6 +162,7 @@ class Transformer(nn.Module):
             self.d_model
         )  # [batch_size, tgt_len, d_model] Input embedding with scaling
         y += self.pos_encoding(tgt)
+        y = self.dropout(y)
         # Decoder forward pass
         decoder_output = self.decoder(
             y,
