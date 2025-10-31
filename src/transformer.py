@@ -369,7 +369,7 @@ class Transformer(nn.Module):
         encoder_output = self.encoder(src, src_key_padding_mask=src_key_padding_mask)
 
         tgt = self.embedding(tgt) * math.sqrt(
-            self.d_model
+            self.kdim
         )  # [batch_size, tgt_len, d_model] Input embedding with scaling
         # Add positional encoding
         tgt = self.pos_encoding(tgt)
