@@ -272,7 +272,7 @@ def create_model_from_config(config: Config) -> torch.nn.Module:
         max_seq_length=config.MAX_SEQ_LENGTH,
         dropout=config.DROPOUT,
         pad_token_id=config.PAD_TOKEN,
-        tie_weights=True,  # Tie embedding and output projection weights
+        tie_weights=False,  # Tie embedding and output projection weights
         kdim=config.KDIM,
         vdim=config.VDIM,
     )

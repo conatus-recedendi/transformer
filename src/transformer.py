@@ -86,11 +86,11 @@ class Transformer(nn.Module):
         )
 
         # Output projection layer
-        self.output_projection = (
-            self.embedding
-            if tie_weights
-            else nn.Linear(d_model, tgt_vocab_size, bias=False)
-        )
+        self.output_projection = nn.Linear(d_model, tgt_vocab_size, bias=False)
+
+        # Optionally tie decoder embedding weights with output projection
+        if tie_weights:
+            self.output_projection.weight = self.embedding.weight
 
         # Initialize weights
         self._initialize_weights()
@@ -168,10 +168,9 @@ class Transformer(nn.Module):
             memory_mask=None,  # Usually not used
             tgt_key_padding_mask=tgt_key_padding_mask,
             memory_key_padding_mask=memory_key_padding_mask,
-        )  # [ batch_size, tgt_len, d_model ]
+        )
 
         # Output projection to vocabulary
-        # output_projection when weight tied
         output = self.output_projection(decoder_output)
 
         return output
