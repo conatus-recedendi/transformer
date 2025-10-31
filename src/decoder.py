@@ -272,9 +272,9 @@ def create_causal_mask(seq_len, device=None):
         device: Device to create tensor on
 
     Returns:
-        mask: [seq_len, seq_len] - True for allowed positions, False for masked
+        mask: [seq_len, seq_len] - True for masked, False for allowed positions
     """
-    mask = torch.triu(torch.ones(seq_len, seq_len, device=device))
+    mask = torch.triu(torch.ones(seq_len, seq_len, device=device), diagonal=1)
     return mask.bool()  # False = masked positions
 
 
@@ -287,6 +287,6 @@ def create_padding_mask(seq, pad_token_id=0):
         pad_token_id: Padding token ID
 
     Returns:
-        mask: [batch_size, seq_len] - True for padding positions
+        mask: [batch_size, seq_len] - True for padding positions(masked), False for non-padding positions
     """
     return seq == pad_token_id
