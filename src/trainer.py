@@ -191,14 +191,15 @@ class Trainer:
             tgt_input = tgt[:, :-1]  # [batch_size, tgt_len-1] - remove last token
             tgt_output = tgt[:, 1:]  # [batch_size, tgt_len-1] - remove first token
 
-        # 🔍 매 배치마다 첫 번째 샘플 데이터 보여주기
-        if self.global_step % 1 == 0:  # 매 배치마다
-            self._debug_batch_sample(
-                src, tgt, tgt_input, tgt_output, batch_idx=self.global_step
-            )
-
         # Forward pass through model
         logits = self.model(src, tgt_input)  # [batch_size, tgt_len-1, vocab_size]
+
+        # 🔍 모델 출력 토큰 디버깅 (설정 가능)
+        if (
+            getattr(self.config, "ENABLE_OUTPUT_DEBUG", False)
+            and self.global_step % getattr(self.config, "DEBUG_OUTPUT_EVERY", 100) == 0
+        ):
+            self._debug_model_output(src, tgt_input, tgt_output, logits)
 
         # Calculate loss
         logits_flat = logits.reshape(-1, logits.size(-1))  # [batch*seq, vocab_size]
@@ -507,6 +508,137 @@ class Trainer:
         self.logger.info(
             f"Resumed from epoch {self.current_epoch}, step {self.global_step}"
         )
+
+    def _debug_model_output(self, src, tgt_input, tgt_output, logits):
+        """모델 출력 토큰 디버깅"""
+        self.logger.info(f"\n{'🤖'*20}")
+        self.logger.info(f"🔍 MODEL OUTPUT DEBUG - Step {self.global_step}")
+        self.logger.info(f"{'🤖'*20}")
+
+        with torch.no_grad():
+            # 첫 번째 배치 샘플만 분석
+            src_sample = src[0]  # [src_len]
+            tgt_input_sample = tgt_input[0]  # [tgt_len]
+            tgt_output_sample = tgt_output[0]  # [tgt_len]
+            logits_sample = logits[0]  # [tgt_len, vocab_size]
+
+            # 예측된 토큰들 (argmax)
+            predicted_tokens = torch.argmax(logits_sample, dim=-1)  # [tgt_len]
+
+            # 토큰을 텍스트로 변환하는 헬퍼 함수
+            def tokens_to_text(tokens, name):
+                tokens_list = tokens.cpu().tolist()
+                tokens_clean = [
+                    t
+                    for t in tokens_list
+                    if t
+                    not in [
+                        self.config.PAD_TOKEN,
+                        self.config.BOS_TOKEN,
+                        self.config.EOS_TOKEN,
+                    ]
+                ]
+
+                try:
+                    if hasattr(self.vocab, "decode"):
+                        text = (
+                            self.vocab.decode(tokens_clean)
+                            if tokens_clean
+                            else "<EMPTY>"
+                        )
+                    else:
+                        text = (
+                            " ".join([str(t) for t in tokens_clean])
+                            if tokens_clean
+                            else "<EMPTY>"
+                        )
+                    return tokens_clean[:10], text
+                except Exception as e:
+                    return tokens_clean[:10], f"<DECODE_ERROR: {e}>"
+
+            # Source 정보
+            src_tokens, src_text = tokens_to_text(src_sample, "Source")
+            self.logger.info(f"📤 Source: {src_tokens} → '{src_text}'")
+
+            # Target input 정보
+            tgt_input_tokens, tgt_input_text = tokens_to_text(
+                tgt_input_sample, "Target Input"
+            )
+            self.logger.info(
+                f"⬇️  Target Input: {tgt_input_tokens} → '{tgt_input_text}'"
+            )
+
+            # Target output (정답) 정보
+            tgt_output_tokens, tgt_output_text = tokens_to_text(
+                tgt_output_sample, "Target Output"
+            )
+            self.logger.info(
+                f"🎯 Target Output (정답): {tgt_output_tokens} → '{tgt_output_text}'"
+            )
+
+            # 모델 예측 정보
+            pred_tokens, pred_text = tokens_to_text(
+                predicted_tokens, "Model Prediction"
+            )
+            self.logger.info(f"🤖 Model Prediction: {pred_tokens} → '{pred_text}'")
+
+            # 토큰별 정확도 계산
+            correct = (predicted_tokens == tgt_output_sample).float()
+            # PAD 토큰 제외한 정확도
+            non_pad_mask = tgt_output_sample != self.config.PAD_TOKEN
+            if non_pad_mask.sum() > 0:
+                accuracy = correct[non_pad_mask].mean().item()
+                self.logger.info(f"📊 Token Accuracy (PAD 제외): {accuracy:.2%}")
+
+            # 상위 5개 예측 토큰 확률 분포 (첫 번째 위치)
+            if logits_sample.size(0) > 0:
+                first_pos_probs = torch.softmax(logits_sample[0], dim=-1)
+                top5_probs, top5_tokens = torch.topk(first_pos_probs, 5)
+
+                self.logger.info(f"🏆 첫 번째 위치 Top-5 예측:")
+                for i, (token, prob) in enumerate(
+                    zip(top5_tokens.cpu().tolist(), top5_probs.cpu().tolist())
+                ):
+                    try:
+                        if hasattr(self.vocab, "decode"):
+                            token_text = self.vocab.decode([token])
+                        else:
+                            token_text = str(token)
+                    except:
+                        token_text = f"<ERR:{token}>"
+
+                    self.logger.info(
+                        f"   {i+1}. Token {token:>6} ({prob:.2%}) → '{token_text}'"
+                    )
+
+            # 토큰별 비교 (처음 5개)
+            self.logger.info(f"🔄 위치별 예측 vs 정답 (처음 5개):")
+            compare_len = min(5, len(predicted_tokens), len(tgt_output_sample))
+            for i in range(compare_len):
+                pred_token = predicted_tokens[i].item()
+                true_token = tgt_output_sample[i].item()
+
+                if true_token == self.config.PAD_TOKEN:
+                    continue
+
+                match_symbol = "✅" if pred_token == true_token else "❌"
+
+                try:
+                    if hasattr(self.vocab, "decode"):
+                        pred_word = self.vocab.decode([pred_token])
+                        true_word = self.vocab.decode([true_token])
+                    else:
+                        pred_word = str(pred_token)
+                        true_word = str(true_token)
+                except:
+                    pred_word = f"<ERR:{pred_token}>"
+                    true_word = f"<ERR:{true_token}>"
+
+                self.logger.info(
+                    f"   [{i}] {match_symbol} 예측:{pred_token:>6}('{pred_word}') vs 정답:{true_token:>6}('{true_word}')"
+                )
+
+        self.logger.info(f"{'🤖'*20}\n")
 
 
 def create_trainer(

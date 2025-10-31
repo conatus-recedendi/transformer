@@ -60,6 +60,8 @@ def load_config_from_json(config_path: str) -> Config:
                 "TOKENS_PER_BATCH": training.get("tokens_per_batch", 25000),
                 "MAX_TOKENS_PER_BATCH": training.get("max_tokens_per_batch", 25000),
                 "ACCUMULATE_GRAD_BATCHES": training.get("accumulate_grad_batches", 1),
+                "DEBUG_OUTPUT_EVERY": training.get("debug_output_every", 100),
+                "ENABLE_OUTPUT_DEBUG": training.get("enable_output_debug", False),
             }
         )
 
