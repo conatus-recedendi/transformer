@@ -111,6 +111,7 @@ class MultiheadAttention(nn.Module):
 
         # Output projection
         attn_output = self.out_linear(attn_output)
+        attn_output = self.dropout_layer(attn_output)
 
         # Handle batch_first
         if not self.batch_first:
@@ -148,9 +149,19 @@ class MultiheadAttention(nn.Module):
         if attn_mask is not None:
             if attn_mask.dim() == 2:
                 # [tgt_len, src_len] -> [1, 1, tgt_len, src_len]
-                attn_mask = attn_mask.unsqueeze(0).unsqueeze(0)
+                attn_mask = attn_mask.unsqueeze(0).unsqueeze(0).transpose(2, 3)
             # attn_mask: True=masked positions, False=allowed positions
             scores = scores.masked_fill(attn_mask, float("-inf"))
+
+            # attn_mask:
+            # 1 1 1
+            # 0 1 1
+            # 0 0 1
+
+            # scores
+            # -inf -inf -inf
+            #  x    -inf -inf
+            #  x     x   -inf
 
         # Apply key padding mask if provided
         if key_padding_mask is not None:
