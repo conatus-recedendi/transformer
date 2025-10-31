@@ -25,7 +25,7 @@
     "accumulate_grad_batches": 1,
     "label_smoothing": 0.1,
     "debug_output_every": 100,
-    "enable_output_debug": false
+    "enable_output_debug": true
   },
 
   "data": {
