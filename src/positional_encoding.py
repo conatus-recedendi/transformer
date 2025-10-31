@@ -1,40 +1,45 @@
-import math
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class PositionalEncoding(nn.Module):
-    """Positional Encoding as described in 'Attention is All You Need'"""
+    """
+    compute sinusoid encoding.
+    """
 
-    def __init__(self, d_model, max_seq_length=5000, dropout=0.1):
+    def __init__(self, d_model, max_len, device):
+        """
+        constructor of sinusoid encoding class
+
+        :param d_model: dimension of model
+        :param max_len: max sequence length
+        :param device: hardware device setting
+        """
         super(PositionalEncoding, self).__init__()
-        self.dropout = nn.Dropout(dropout)
 
-        # Create positional encoding matrix
-        pe = torch.zeros(max_seq_length, d_model)
-        position = torch.arange(0, max_seq_length, dtype=torch.float).unsqueeze(1)
+        # same size with input matrix (for adding with input matrix)
+        self.encoding = torch.zeros(max_len, d_model, device=device)
+        self.encoding.requires_grad = False  # we don't need to compute gradient
 
-        # Create div_term for sine and cosine functions
-        div_term = torch.exp(
-            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
-        )
+        pos = torch.arange(0, max_len, device=device)
+        pos = pos.float().unsqueeze(dim=1)
+        # 1D => 2D unsqueeze to represent word's position
 
-        # Apply sine to even indices
-        pe[:, 0::2] = torch.sin(position * div_term)
-        # Apply cosine to odd indices
-        pe[:, 1::2] = torch.cos(position * div_term)
+        _2i = torch.arange(0, d_model, step=2, device=device).float()
+        # 'i' means index of d_model (e.g. embedding size = 50, 'i' = [0,50])
+        # "step=2" means 'i' multiplied with two (same with 2 * i)
 
-        # Add batch dimension and register as buffer
-        pe = pe.unsqueeze(0)  # [1, max_seq_length, d_model]
-        self.register_buffer("pe", pe)
+        self.encoding[:, 0::2] = torch.sin(pos / (10000 ** (_2i / d_model)))
+        self.encoding[:, 1::2] = torch.cos(pos / (10000 ** (_2i / d_model)))
+        # compute positional encoding to consider positional information of words
 
     def forward(self, x):
-        """
-        Args:
-            x: [batch_size, seq_len, d_model]
-        Returns:
-            x + positional encoding: [batch_size, seq_len, d_model]
-        """
-        seq_len = x.size(1)
-        x = x + self.pe[:, :seq_len, :]
-        return self.dropout(x)
+        # self.encoding
+        # [max_len = 512, d_model = 512]
+
+        batch_size, seq_len = x.size()
+        # [batch_size = 128, seq_len = 30]
+
+        return self.encoding[:seq_len, :]
+        # [seq_len = 30, d_model = 512]
+        # it will add with tok_emb : [128, 30, 512]
