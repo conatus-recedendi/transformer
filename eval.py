@@ -653,7 +653,7 @@ def main():
     # Load test data
     print("\n🔄 Loading test data...")
     try:
-        train_loader, val_loader, test_loader = load_data(
+        train_loader, val_loader, test_loader, vocab = load_data(
             config, use_dummy=args.use_dummy_data
         )
 
@@ -661,12 +661,9 @@ def main():
             print("❌ Failed to load test data")
             return
 
-        # Get vocabulary from data loader
-        # This is a bit tricky - we need to access the dataset's vocabulary
-        if hasattr(test_loader.dataset, "vocab"):
-            vocab = test_loader.dataset.vocab
-        else:
-            # For dummy data, create a simple vocab
+        # Vocab is now directly returned from load_data function
+        if vocab is None:
+            # For dummy data, create a simple vocab as fallback
             from src.data_loader import DummyTokenizer
 
             vocab = DummyTokenizer(config.VOCAB_SIZE)

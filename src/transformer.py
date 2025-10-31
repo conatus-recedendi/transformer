@@ -95,10 +95,16 @@ class Transformer(nn.Module):
 
     def _initialize_weights(self):
         """Initialize all parameters with uniform distribution U[-0.1, 0.1]"""
+        # Initialize embedding layer
+        nn.init.uniform_(self.embedding.weight, -0.1, 0.1)
+
+        # Initialize output projection if not tied
         if not self.tie_weights:
             nn.init.uniform_(self.output_projection.weight, -0.1, 0.1)
 
-    # /        print(f"Transformer: Initialized all parameters with U[-0.1, 0.1]")
+        print(
+            f"Transformer: Initialized embedding and output projection with U[-0.1, 0.1]"
+        )
 
     def forward(
         self,
