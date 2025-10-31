@@ -222,7 +222,7 @@ class Trainer:
 
         # TODO: remove
         # 🔍 첫 번째 시퀀스 위치의 logits 분석
-        if logits_flat.size(0) > 0 and tgt_flat.size(0) > 0:
+        # if logits_flat.size(0) > 0 and tgt_flat.size(0) > 0:
             first_logits = logits_flat[0]  # [vocab_size] - 첫 번째 위치의 logits
             first_target = tgt_flat[0].item()  # 첫 번째 위치의 정답 토큰
 
