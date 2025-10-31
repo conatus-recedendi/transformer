@@ -274,8 +274,8 @@ def create_causal_mask(seq_len, device=None):
     Returns:
         mask: [seq_len, seq_len] - True for allowed positions, False for masked
     """
-    mask = torch.triu(torch.ones(seq_len, seq_len, device=device), diagonal=1)
-    return ~(mask.bool())  # False = masked positions
+    mask = torch.triu(torch.ones(seq_len, seq_len, device=device))
+    return mask.bool()  # False = masked positions
 
 
 def create_padding_mask(seq, pad_token_id=0):
