@@ -149,7 +149,7 @@ class Transformer(nn.Module):
             tgt_mask = create_causal_mask(tgt_len, device=tgt.device)
 
         x = self.embedding(src) * math.sqrt(
-            self.vdim
+            self.d_model
         )  # [batch_size, src_len, d_model] Input embedding with scaling
         x = self.pos_encoding(x)
         # Encoder forward pass
@@ -157,7 +157,7 @@ class Transformer(nn.Module):
             x, src_mask=src_mask, src_key_padding_mask=src_key_padding_mask
         )
         y = self.embedding(tgt) * math.sqrt(
-            self.vdim
+            self.d_model
         )  # [batch_size, tgt_len, d_model] Input embedding with scaling
         y = self.pos_encoding(y)
         # Decoder forward pass
@@ -355,7 +355,7 @@ class Transformer(nn.Module):
         tgt_mask = create_causal_mask(tgt_len, device=tgt.device)
 
         src = self.embedding(src) * math.sqrt(
-            self.kdim
+            self.d_model
         )  # [batch_size, src_len, d_model] Input embedding with scaling
         # Add positional encoding
         src = self.pos_encoding(src)
@@ -369,7 +369,7 @@ class Transformer(nn.Module):
         encoder_output = self.encoder(src, src_key_padding_mask=src_key_padding_mask)
 
         tgt = self.embedding(tgt) * math.sqrt(
-            self.kdim
+            self.d_model
         )  # [batch_size, tgt_len, d_model] Input embedding with scaling
         # Add positional encoding
         tgt = self.pos_encoding(tgt)
