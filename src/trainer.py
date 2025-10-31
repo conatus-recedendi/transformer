@@ -31,9 +31,7 @@ class LRScheduler:
 
     def step(self):
         """Update learning rate"""
-        self.step_num += 1 / (
-            self.batch_size / 128
-        )  # step num added by batch_size /128
+        self.step_num += 1  # step num added by batch_size /128
         lr = self._calculate_lr()
 
         for param_group in self.optimizer.param_groups:
@@ -41,11 +39,11 @@ class LRScheduler:
 
     def _calculate_lr(self):
         """Calculate learning rate based on step number"""
-        step_num = self.step_num
-        warmup_steps = self.warmup_steps
+        step_num = self.step_num // 8
+        warmup_steps = self.warmup_steps // 8
         d_model = self.d_model
 
-        lr = (d_model**-0.5) * min(step_num**-0.5, step_num * warmup_steps**-1.5)
+        lr = (d_model**-0.5) * min(step_num**-0.5, step_num * (warmup_steps) ** -1.5)
         return lr
 
 

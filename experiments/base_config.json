@@ -17,7 +17,7 @@
   "training": {
     "batch_size": 16,
     "learning_rate": 1e-4,
-    "warmup_steps": 4000,
+    "warmup_steps": 32000,
     "max_epochs": 4,
     "gradient_clip": 1.0,
     "tokens_per_batch": 25000,
