@@ -132,17 +132,7 @@ class Trainer:
             self.optimizer, config.MODEL_DIM, config.WARMUP_STEPS, config.BATCH_SIZE
         )
 
-        # Setup loss function with label smoothing
-        label_smoothing = getattr(config, "LABEL_SMOOTHING", 0.0)
-        if label_smoothing > 0:
-            self.criterion = LabelSmoothingLoss(
-                num_classes=config.VOCAB_SIZE,
-                smoothing=label_smoothing,
-                ignore_index=config.PAD_TOKEN,
-            )
-            self.logger.info(f"Using Label Smoothing: {label_smoothing}")
-        else:
-            self.criterion = nn.CrossEntropyLoss(ignore_index=config.PAD_TOKEN)
+        self.criterion = nn.CrossEntropyLoss(ignore_index=config.PAD_TOKEN)
 
         # Training state
         self.current_epoch = 0
