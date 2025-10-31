@@ -39,8 +39,8 @@ class LRScheduler:
 
     def _calculate_lr(self):
         """Calculate learning rate based on step number"""
-        step_num = self.step_num // 8
-        warmup_steps = self.warmup_steps // 8
+        step_num = self.step_num // 8 + 1
+        warmup_steps = self.warmup_steps // 8 + 1
         d_model = self.d_model
 
         lr = (d_model**-0.5) * min(step_num**-0.5, step_num * (warmup_steps) ** -1.5)
