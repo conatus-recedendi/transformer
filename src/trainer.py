@@ -609,17 +609,21 @@ class Trainer:
             tgt_input_tokens, tgt_input_text = tokens_to_text(
                 tgt_input_sample, "Target Input"
             )
+            tgt_input_raw = tgt_input_sample.cpu().tolist()[:15]  # 처음 15개 토큰
             self.logger.info(
                 f"⬇️  Target Input: {tgt_input_tokens} → '{tgt_input_text}'"
             )
+            self.logger.info(f"   Raw tokens: {tgt_input_raw}")
 
             # Target output (정답) 정보
             tgt_output_tokens, tgt_output_text = tokens_to_text(
                 tgt_output_sample, "Target Output"
             )
+            tgt_output_raw = tgt_output_sample.cpu().tolist()[:15]  # 처음 15개 토큰
             self.logger.info(
                 f"🎯 Target Output (정답): {tgt_output_tokens} → '{tgt_output_text}'"
             )
+            self.logger.info(f"   Raw tokens: {tgt_output_raw}")
 
             # 모델 예측 정보
             pred_tokens, pred_text = tokens_to_text(
