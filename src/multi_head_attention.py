@@ -150,7 +150,7 @@ class MultiheadAttention(nn.Module):
                 # [tgt_len, src_len] -> [1, 1, tgt_len, src_len]
                 attn_mask = attn_mask.unsqueeze(0).unsqueeze(0)
             # attn_mask: True=allowed, False=masked → mask False positions
-            scores = scores.masked_fill(attn_mask, float("-inf"))
+            scores = scores.masked_fill(attn_mask == 0, float("-inf"))
 
         # Apply key padding mask if provided
         if key_padding_mask is not None:
