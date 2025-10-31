@@ -170,11 +170,12 @@ class BeamSearchDecoder:
                 tgt = seq.unsqueeze(0)  # [1, seq_len]
                 tgt_len = tgt.size(1)
 
-                # Create target mask
-                tgt_mask = torch.triu(
-                    torch.ones(tgt_len, tgt_len, device=self.device), diagonal=1
+                # Create target mask (causal mask)
+                tgt_mask = torch.tril(
+                    torch.ones(tgt_len, tgt_len, device=self.device)
                 ).bool()
-                tgt_mask = tgt_mask.unsqueeze(0)  # [1, tgt_len, tgt_len]
+                # Convert to attention mask format (False for allowed, True for masked)
+                tgt_mask = ~tgt_mask  # Invert for attention mask
 
                 # Forward pass using the complete model
                 with torch.no_grad():

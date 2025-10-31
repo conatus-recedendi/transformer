@@ -35,12 +35,12 @@ class MultiheadAttention(nn.Module):
         self.q_k_embed_dim = self.kdim * num_heads
 
         # Linear projections for Q, K, V (all heads combined)
-        self.q_linear = nn.Linear(self.q_k_embed_dim, self.q_k_embed_dim, bias=bias)
-        self.k_linear = nn.Linear(self.q_k_embed_dim, self.q_k_embed_dim, bias=bias)
-        self.v_linear = nn.Linear(embed_dim, embed_dim, bias=bias)
+        self.q_linear = nn.Linear(embed_dim, self.kdim * num_heads, bias=bias)
+        self.k_linear = nn.Linear(embed_dim, self.kdim * num_heads, bias=bias)
+        self.v_linear = nn.Linear(embed_dim, self.vdim * num_heads, bias=bias)
 
         # Output projection
-        self.out_linear = nn.Linear(self.embed_dim, self.embed_dim, bias=bias)
+        self.out_linear = nn.Linear(self.vdim * num_heads, embed_dim, bias=bias)
 
         # Dropout layer
         self.dropout_layer = nn.Dropout(dropout)
@@ -83,13 +83,11 @@ class MultiheadAttention(nn.Module):
         src_len = key.size(1)
 
         # Linear projections for Q, K, V
-        Q = self.q_linear(query)  # [batch_size, tgt_len, kdim]
-        K = self.k_linear(key)  # [batch_size, src_len, kdim]
-        V = self.v_linear(value)  # [batch_size, src_len, vdim]
+        Q = self.q_linear(query)  # [batch_size, tgt_len, kdim * num_heads]
+        K = self.k_linear(key)  # [batch_size, src_len, kdim * num_heads]
+        V = self.v_linear(value)  # [batch_size, src_len, vdim * num_heads]
 
         # Reshape for multi-head attention
-        # [batch_size, seq_len, embed_dim] -> [batch_size, seq_len, num_heads, head_dim]
-        # Q = Q.view(batch_size, tgt_len, self.num_heads, self.kdim)
         Q = Q.view(batch_size, tgt_len, self.num_heads, self.kdim)
         K = K.view(batch_size, src_len, self.num_heads, self.kdim)
         V = V.view(batch_size, src_len, self.num_heads, self.vdim)
@@ -104,11 +102,11 @@ class MultiheadAttention(nn.Module):
             Q, K, V, key_padding_mask, attn_mask
         )
 
-        # Concatenate heads: [batch_size, num_heads, tgt_len, vdim] -> [batch_size, tgt_len, embed_dim]
+        # Concatenate heads: [batch_size, num_heads, tgt_len, vdim] -> [batch_size, tgt_len, vdim * num_heads]
         attn_output = (
             attn_output.transpose(1, 2)
             .contiguous()
-            .view(batch_size, tgt_len, self.embed_dim)
+            .view(batch_size, tgt_len, self.vdim * self.num_heads)
         )
 
         # Output projection
