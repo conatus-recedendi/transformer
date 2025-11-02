@@ -22,6 +22,175 @@ from src.transformer import Transformer
 from src.utils import set_seed, get_device, print_model_summary
 
 
+def verify_data_alignment(data_loader, vocab, logger):
+    """DataLoader에서 src/tgt 데이터 정렬 검증"""
+    logger.info("=" * 60)
+    logger.info("DATA ALIGNMENT VERIFICATION")
+    logger.info("=" * 60)
+
+    batch_count = 0
+    for batch_idx, batch in enumerate(data_loader):
+        if batch_idx >= 3:  # 처음 3배치만 확인
+            break
+
+        batch_count += 1
+        src = batch["src"]  # [batch_size, seq_len]
+        tgt = batch["tgt"]  # [batch_size, seq_len] (BOS + original)
+        tgt_y = batch["tgt_y"]  # [batch_size, seq_len] (original + EOS)
+
+        logger.info(f"\n📦 Batch {batch_idx + 1}:")
+        logger.info(f"  Batch size: {src.size(0)}")
+        logger.info(f"  Src shape: {src.shape}")
+        logger.info(f"  Tgt shape: {tgt.shape}")
+        logger.info(f"  Tgt_y shape: {tgt_y.shape}")
+
+        # 각 배치에서 처음 2개 샘플만 확인
+        samples_to_check = min(2, src.size(0))
+
+        for sample_idx in range(samples_to_check):
+            src_sample = src[sample_idx]
+            tgt_sample = tgt[sample_idx]
+            tgt_y_sample = tgt_y[sample_idx]
+
+            # 패딩 제거 (0이 아닌 토큰만)
+            src_tokens = src_sample[src_sample != 0].tolist()
+            tgt_tokens = tgt_sample[tgt_sample != 0].tolist()
+            tgt_y_tokens = tgt_y_sample[tgt_y_sample != 0].tolist()
+
+            logger.info(f"\n  🔍 Sample {sample_idx + 1}:")
+            logger.info(f"    Src length: {len(src_tokens)}")
+            logger.info(f"    Tgt length: {len(tgt_tokens)}")
+            logger.info(f"    Tgt_y length: {len(tgt_y_tokens)}")
+
+            # 토큰 ID 일부 출력
+            logger.info(f"    Src tokens: {src_tokens[:15]}...")
+            logger.info(f"    Tgt tokens: {tgt_tokens[:15]}...")
+            logger.info(f"    Tgt_y tokens: {tgt_y_tokens[:15]}...")
+
+            if vocab:
+                try:
+                    # 텍스트로 디코딩
+                    src_text = vocab.decode(src_tokens)
+
+                    # BOS 토큰 제거하고 디코딩
+                    tgt_text = vocab.decode(
+                        tgt_tokens[1:] if len(tgt_tokens) > 1 else tgt_tokens
+                    )
+
+                    # EOS 토큰 제거하고 디코딩
+                    tgt_y_text = vocab.decode(
+                        tgt_y_tokens[:-1] if len(tgt_y_tokens) > 1 else tgt_y_tokens
+                    )
+
+                    logger.info(f"    ✨ Decoded texts:")
+                    logger.info(f"    📖 Src: {src_text[:100]}...")
+                    logger.info(f"    📝 Tgt: {tgt_text[:100]}...")
+                    logger.info(f"    📋 Tgt_y: {tgt_y_text[:100]}...")
+
+                    # BOS/EOS 토큰 확인
+                    bos_token = getattr(vocab, "bos_token_id", 1)
+                    eos_token = getattr(vocab, "eos_token_id", 2)
+
+                    has_bos = len(tgt_tokens) > 0 and tgt_tokens[0] == bos_token
+                    has_eos = len(tgt_y_tokens) > 0 and tgt_y_tokens[-1] == eos_token
+
+                    logger.info(f"    🏁 Token verification:")
+                    logger.info(f"      BOS in tgt: {has_bos} (expected: True)")
+                    logger.info(f"      EOS in tgt_y: {has_eos} (expected: True)")
+
+                    # 텍스트 일치성 확인
+                    texts_match = tgt_text.strip() == tgt_y_text.strip()
+                    logger.info(
+                        f"      Tgt/Tgt_y match: {texts_match} (expected: True)"
+                    )
+
+                    if not texts_match:
+                        logger.warning(f"      ⚠️  Tgt and Tgt_y texts don't match!")
+                        logger.warning(f"        Tgt: '{tgt_text}'")
+                        logger.warning(f"        Tgt_y: '{tgt_y_text}'")
+
+                except Exception as e:
+                    logger.error(f"    ❌ Error decoding tokens: {e}")
+
+            else:
+                logger.warning("    ⚠️  No vocab available for text decoding")
+
+    logger.info(f"\n✅ Data alignment verification completed for {batch_count} batches")
+    logger.info("=" * 60)
+
+
+def verify_file_alignment(config, logger):
+    """원본 파일에서 라인별 정렬 검증"""
+    logger.info("=" * 60)
+    logger.info("FILE ALIGNMENT VERIFICATION")
+    logger.info("=" * 60)
+
+    # 파일 경로 설정
+    data_path = Path(config.DATA_PATH)
+    dataset_path = data_path / config.DATASET
+
+    src_lang = getattr(config, "SRC_LANG", "en")
+    tgt_lang = getattr(config, "TGT_LANG", "de")
+
+    train_src_file = dataset_path / f"train.14.{src_lang}"
+    train_tgt_file = dataset_path / f"train.14.{tgt_lang}"
+
+    if not train_src_file.exists() or not train_tgt_file.exists():
+        logger.warning(f"⚠️  Files not found for verification:")
+        logger.warning(f"    {train_src_file}")
+        logger.warning(f"    {train_tgt_file}")
+        return
+
+    logger.info(f"📁 Checking files:")
+    logger.info(f"  Source: {train_src_file}")
+    logger.info(f"  Target: {train_tgt_file}")
+
+    # 파일 라인 수 확인
+    with open(train_src_file, "r", encoding="utf-8") as f:
+        src_line_count = sum(1 for _ in f)
+    with open(train_tgt_file, "r", encoding="utf-8") as f:
+        tgt_line_count = sum(1 for _ in f)
+
+    logger.info(f"\n📊 Line counts:")
+    logger.info(f"  Source file: {src_line_count:,} lines")
+    logger.info(f"  Target file: {tgt_line_count:,} lines")
+    logger.info(f"  Match: {src_line_count == tgt_line_count}")
+
+    if src_line_count != tgt_line_count:
+        logger.error("❌ File line counts don't match!")
+        return
+
+    # 첫 10라인 비교
+    logger.info(f"\n🔍 Checking first 10 lines:")
+    with open(train_src_file, "r", encoding="utf-8") as f_src, open(
+        train_tgt_file, "r", encoding="utf-8"
+    ) as f_tgt:
+
+        for i, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt)):
+            if i >= 10:
+                break
+
+            src_line = src_line.strip()
+            tgt_line = tgt_line.strip()
+
+            logger.info(f"  Line {i+1}:")
+            logger.info(f"    📖 {src_lang.upper()}: {src_line[:80]}...")
+            logger.info(f"    📝 {tgt_lang.upper()}: {tgt_line[:80]}...")
+
+            # 빈 라인 체크
+            if not src_line and not tgt_line:
+                logger.info(f"    ⚠️  Both lines are empty")
+            elif not src_line:
+                logger.warning(f"    ⚠️  Source line is empty")
+            elif not tgt_line:
+                logger.warning(f"    ⚠️  Target line is empty")
+
+            logger.info("")
+
+    logger.info("✅ File alignment verification completed")
+    logger.info("=" * 60)
+
+
 def load_config_from_json(config_path: str) -> Config:
     """Load configuration from JSON file"""
     with open(config_path, "r", encoding="utf-8") as f:
@@ -208,6 +377,10 @@ def load_data(config: Config, use_dummy: bool = True):
         logger.info(f"  - Validation: {len(val_dataset):,} samples")
         logger.info(f"  - Test: {len(test_dataset):,} samples")
 
+        # 🔍 더미 데이터도 정합성 검증
+        logger.info("🔍 Verifying dummy data alignment in train_loader...")
+        verify_data_alignment(train_loader, None, logger)
+
     else:
         # 실제 WMT 데이터 로딩 (분리된 언어 파일 형식)
         logger.info("🔄 Loading real WMT dataset...")
@@ -224,6 +397,14 @@ def load_data(config: Config, use_dummy: bool = True):
                 config.DATASET = "wmt14_en_de"
 
             train_loader, val_loader, test_loader, vocab = load_real_wmt_data(config)
+
+            # 🔍 데이터 정합성 검증 추가
+            if train_loader is not None and vocab is not None:
+                logger.info("🔍 Verifying file alignment first...")
+                verify_file_alignment(config, logger)
+
+                logger.info("🔍 Verifying data alignment in train_loader...")
+                verify_data_alignment(train_loader, vocab, logger)
 
             if train_loader is None:
                 logger.error("❌ Failed to load real data. Check if data files exist:")
