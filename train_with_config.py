@@ -168,7 +168,7 @@ def verify_file_alignment(config, logger):
 
         try:
             with open(
-                file_path, "r", encoding="utf-8", errors="replace", newlines="\n"
+                file_path, "r", encoding="utf-8", errors="replace", newline="\n"
             ) as f:
                 for line_num, line in enumerate(f, 1):
                     text_line_count += 1
@@ -241,8 +241,8 @@ def verify_file_alignment(config, logger):
 
     # 첫 10라인 비교 - newlines='\n' 사용
     logger.info(f"\n🔍 Checking first 10 lines:")
-    with open(train_src_file, "r", encoding="utf-8", newlines="\n") as f_src, open(
-        train_tgt_file, "r", encoding="utf-8", newlines="\n"
+    with open(train_src_file, "r", encoding="utf-8", newline="\n") as f_src, open(
+        train_tgt_file, "r", encoding="utf-8", newline="\n"
     ) as f_tgt:
 
         for i, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt)):
