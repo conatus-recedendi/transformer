@@ -209,15 +209,47 @@ class RealWMTDataset(Dataset):
             logger.warning(f"Data files not found: {self.src_file} or {self.tgt_file}")
             return data_pairs
 
-        with open(self.src_file, "r", encoding="utf-8") as f_src, open(
-            self.tgt_file, "r", encoding="utf-8"
+        # 🔍 바이너리 모드로 정확한 라인 수 확인
+        def count_binary_lines(file_path):
+            with open(file_path, "rb") as f:
+                return f.read().count(b"\n")
+
+        src_line_count = count_binary_lines(self.src_file)
+        tgt_line_count = count_binary_lines(self.tgt_file)
+
+        if src_line_count != tgt_line_count:
+            logger.error(f"❌ Binary line count mismatch:")
+            logger.error(f"  {self.src_file}: {src_line_count:,} lines")
+            logger.error(f"  {self.tgt_file}: {tgt_line_count:,} lines")
+            raise ValueError(
+                "Source and target files must have the same number of lines"
+            )
+
+        logger.info(f"📊 Binary line counts match: {src_line_count:,} lines each")
+
+        # 🚨 강력한 파일 읽기 - errors='replace' 사용
+        processed_pairs = 0
+        skipped_pairs = 0
+
+        with open(
+            self.src_file, "r", encoding="utf-8", errors="replace"
+        ) as f_src, open(
+            self.tgt_file, "r", encoding="utf-8", errors="replace"
         ) as f_tgt:
 
-            for line_num, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt)):
+            for line_num, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt), 1):
                 src_line = src_line.strip()
                 tgt_line = tgt_line.strip()
 
-                if not src_line or not tgt_line:
+                # 🚨 빈 라인 쌍은 모두 건너뛰기
+                if not src_line and not tgt_line:
+                    skipped_pairs += 1
+                    continue
+                elif not src_line or not tgt_line:
+                    # 한쪽만 비어있으면 경고하고 건너뛰기
+                    if skipped_pairs < 10:  # 처음 10개만 로깅
+                        logger.warning(f"Line {line_num}: One-sided empty - skipping")
+                    skipped_pairs += 1
                     continue
 
                 src_tokens = src_line.strip()
@@ -231,6 +263,15 @@ class RealWMTDataset(Dataset):
                     and len(tgt_tokens) <= self.max_length
                 ):
                     data_pairs.append((src_tokens, tgt_tokens))
+                    processed_pairs += 1
+                else:
+                    skipped_pairs += 1
+
+        logger.info(f"✅ Data loading completed:")
+        logger.info(f"  Binary line count: {src_line_count:,}")
+        logger.info(f"  Processed pairs: {processed_pairs:,}")
+        logger.info(f"  Skipped pairs: {skipped_pairs:,}")
+        logger.info(f"  Success rate: {processed_pairs/src_line_count*100:.1f}%")
 
         return data_pairs
 

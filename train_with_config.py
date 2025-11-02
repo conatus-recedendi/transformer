@@ -145,15 +145,77 @@ def verify_file_alignment(config, logger):
     logger.info(f"  Source: {train_src_file}")
     logger.info(f"  Target: {train_tgt_file}")
 
-    # 파일 라인 수 확인
-    with open(train_src_file, "r", encoding="utf-8") as f:
-        src_line_count = sum(1 for _ in f)
-    with open(train_tgt_file, "r", encoding="utf-8") as f:
-        tgt_line_count = sum(1 for _ in f)
+    # 파일 라인 수 확인 - 더 강력한 방법 사용
+    logger.info(f"\n🧮 Advanced line counting:")
 
-    logger.info(f"\n📊 Line counts:")
-    logger.info(f"  Source file: {src_line_count:,} lines")
-    logger.info(f"  Target file: {tgt_line_count:,} lines")
+    def count_lines_robust(file_path, name):
+        """더 강력한 라인 카운팅 - 바이너리와 텍스트 모드 둘 다 사용"""
+        # 1. 바이너리 모드로 \n 개수 세기
+        with open(file_path, "rb") as f:
+            content = f.read()
+            binary_line_count = content.count(b"\n")
+
+        # 2. 특수 문자 확인
+        null_count = content.count(b"\x00")
+        cr_count = content.count(b"\r")
+        crlf_count = content.count(b"\r\n")
+
+        # 3. 텍스트 모드로 라인별 읽기
+        text_line_count = 0
+        empty_lines = 0
+        problem_lines = 0
+
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                for line_num, line in enumerate(f, 1):
+                    text_line_count += 1
+                    if not line.strip():
+                        empty_lines += 1
+                    if "\x00" in line or len(line.encode("utf-8")) != len(line):
+                        problem_lines += 1
+                        if problem_lines <= 3:
+                            logger.warning(
+                                f"    {name} line {line_num} has special chars: {repr(line[:30])}"
+                            )
+        except Exception as e:
+            logger.error(f"    Error reading {name}: {e}")
+
+        logger.info(f"  {name} analysis:")
+        logger.info(f"    Binary \\n count: {binary_line_count:,}")
+        logger.info(f"    Text lines read: {text_line_count:,}")
+        logger.info(f"    Empty lines: {empty_lines:,}")
+        logger.info(f"    NULL bytes: {null_count}")
+        logger.info(f"    CR chars: {cr_count}")
+        logger.info(f"    CRLF pairs: {crlf_count}")
+        logger.info(f"    Problem lines: {problem_lines}")
+
+        return text_line_count, binary_line_count, problem_lines > 0
+
+    src_text_count, src_binary_count, src_has_problems = count_lines_robust(
+        train_src_file, "SRC"
+    )
+    tgt_text_count, tgt_binary_count, tgt_has_problems = count_lines_robust(
+        train_tgt_file, "TGT"
+    )
+
+    logger.info(f"\n📊 Line count summary:")
+    logger.info(f"  Source: text={src_text_count:,}, binary={src_binary_count:,}")
+    logger.info(f"  Target: text={tgt_text_count:,}, binary={tgt_binary_count:,}")
+    logger.info(f"  Text count difference: {abs(src_text_count - tgt_text_count):,}")
+    logger.info(
+        f"  Binary count difference: {abs(src_binary_count - tgt_binary_count):,}"
+    )
+    logger.info(
+        f"  Files have problems: SRC={src_has_problems}, TGT={tgt_has_problems}"
+    )
+
+    # 바이너리 카운트를 우선 사용 (더 정확함)
+    src_line_count = src_binary_count
+    tgt_line_count = tgt_binary_count
+
+    logger.info(
+        f"  Using binary counts for comparison: SRC={src_line_count:,}, TGT={tgt_line_count:,}"
+    )
     logger.info(f"  Match: {src_line_count == tgt_line_count}")
 
     if src_line_count != tgt_line_count:
