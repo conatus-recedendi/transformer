@@ -227,14 +227,32 @@ class RealWMTDataset(Dataset):
 
         logger.info(f"📊 Binary line counts match: {src_line_count:,} lines each")
 
-        # 🚨 강력한 파일 읽기 - errors='replace' 사용
+        # 🚨 단독 \r 문자 문제 감지 및 경고
+        def check_standalone_cr(file_path):
+            with open(file_path, "rb") as f:
+                data = f.read()
+                cr_count = data.count(b"\r")
+                crlf_count = data.count(b"\r\n")
+                standalone_cr = cr_count - crlf_count
+                return standalone_cr
+
+        src_standalone_cr = check_standalone_cr(self.src_file)
+        tgt_standalone_cr = check_standalone_cr(self.tgt_file)
+
+        if src_standalone_cr > 0 or tgt_standalone_cr > 0:
+            logger.warning(f"⚠️  Standalone \\r characters detected:")
+            logger.warning(f"  {self.src_file}: {src_standalone_cr} standalone \\r")
+            logger.warning(f"  {self.tgt_file}: {tgt_standalone_cr} standalone \\r")
+            logger.warning(f"  Using newlines='\\n' mode to prevent misalignment")
+
+        # 🚨 강력한 파일 읽기 - newlines='\n'으로 단독 \r 문제 해결
         processed_pairs = 0
         skipped_pairs = 0
 
         with open(
-            self.src_file, "r", encoding="utf-8", errors="replace"
+            self.src_file, "r", encoding="utf-8", errors="replace", newlines="\n"
         ) as f_src, open(
-            self.tgt_file, "r", encoding="utf-8", errors="replace"
+            self.tgt_file, "r", encoding="utf-8", errors="replace", newlines="\n"
         ) as f_tgt:
 
             for line_num, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt), 1):

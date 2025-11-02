@@ -160,13 +160,16 @@ def verify_file_alignment(config, logger):
         cr_count = content.count(b"\r")
         crlf_count = content.count(b"\r\n")
 
-        # 3. 텍스트 모드로 라인별 읽기
+        # 3. 텍스트 모드로 라인별 읽기 (newlines='\n'으로 단독 \r 문제 해결)
         text_line_count = 0
         empty_lines = 0
         problem_lines = 0
+        standalone_cr = cr_count - crlf_count
 
         try:
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+            with open(
+                file_path, "r", encoding="utf-8", errors="replace", newlines="\n"
+            ) as f:
                 for line_num, line in enumerate(f, 1):
                     text_line_count += 1
                     if not line.strip():
@@ -187,15 +190,21 @@ def verify_file_alignment(config, logger):
         logger.info(f"    NULL bytes: {null_count}")
         logger.info(f"    CR chars: {cr_count}")
         logger.info(f"    CRLF pairs: {crlf_count}")
+        logger.info(f"    Standalone \\r: {standalone_cr}")
         logger.info(f"    Problem lines: {problem_lines}")
 
-        return text_line_count, binary_line_count, problem_lines > 0
+        if standalone_cr > 0:
+            logger.warning(
+                f"    ⚠️  {standalone_cr} standalone \\r chars can cause alignment issues!"
+            )
 
-    src_text_count, src_binary_count, src_has_problems = count_lines_robust(
-        train_src_file, "SRC"
+        return text_line_count, binary_line_count, problem_lines > 0, standalone_cr
+
+    src_text_count, src_binary_count, src_has_problems, src_standalone_cr = (
+        count_lines_robust(train_src_file, "SRC")
     )
-    tgt_text_count, tgt_binary_count, tgt_has_problems = count_lines_robust(
-        train_tgt_file, "TGT"
+    tgt_text_count, tgt_binary_count, tgt_has_problems, tgt_standalone_cr = (
+        count_lines_robust(train_tgt_file, "TGT")
     )
 
     logger.info(f"\n📊 Line count summary:")
@@ -208,6 +217,14 @@ def verify_file_alignment(config, logger):
     logger.info(
         f"  Files have problems: SRC={src_has_problems}, TGT={tgt_has_problems}"
     )
+    logger.info(
+        f"  Standalone \\r chars: SRC={src_standalone_cr}, TGT={tgt_standalone_cr}"
+    )
+
+    if src_standalone_cr > 0 or tgt_standalone_cr > 0:
+        logger.warning(
+            f"  ⚠️  Standalone \\r characters detected! Using newlines='\\n' mode for alignment."
+        )
 
     # 바이너리 카운트를 우선 사용 (더 정확함)
     src_line_count = src_binary_count
@@ -222,10 +239,10 @@ def verify_file_alignment(config, logger):
         logger.error("❌ File line counts don't match!")
         return
 
-    # 첫 10라인 비교
+    # 첫 10라인 비교 - newlines='\n' 사용
     logger.info(f"\n🔍 Checking first 10 lines:")
-    with open(train_src_file, "r", encoding="utf-8") as f_src, open(
-        train_tgt_file, "r", encoding="utf-8"
+    with open(train_src_file, "r", encoding="utf-8", newlines="\n") as f_src, open(
+        train_tgt_file, "r", encoding="utf-8", newlines="\n"
     ) as f_tgt:
 
         for i, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt)):
