@@ -330,7 +330,11 @@ class RealWMTDataset(Dataset):
         tgt_ids = self.vocab.encode(tgt_text)
 
         # BOS/EOS 토큰 추가
-        tgt_input = [self.vocab.special_tokens["<BOS>"]] + tgt_ids
+        tgt_input = (
+            [self.vocab.special_tokens["<BOS>"]]
+            + tgt_ids
+            + [self.vocab.special_tokens["<EOS>"]]
+        )
         tgt_output = tgt_ids + [self.vocab.special_tokens["<EOS>"]]
 
         return {
