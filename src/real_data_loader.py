@@ -330,16 +330,8 @@ class RealWMTDataset(Dataset):
         tgt_ids = self.vocab.encode(tgt_text)
 
         # BOS/EOS 토큰 추가
-        tgt_input = (
-            [self.vocab.special_tokens["<BOS>"]]
-            + tgt_ids
-            + [self.vocab.special_tokens["<EOS>"]]
-        )
-        tgt_output = (
-            [self.vocab.special_tokens["<BOS>"]]
-            + tgt_ids
-            + [self.vocab.special_tokens["<EOS>"]]
-        )
+        tgt_input = [self.vocab.special_tokens["<BOS>"]] + tgt_ids
+        tgt_output = tgt_ids + [self.vocab.special_tokens["<EOS>"]]
 
         return {
             "src": torch.tensor(src_ids, dtype=torch.long),
@@ -506,7 +498,7 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
     train_loader = DataLoader(
         train_dataset,
         batch_size=config.BATCH_SIZE,
-        shuffle=False,
+        shuffle=True,
         collate_fn=lambda batch: collate_fn_real(batch, config.PAD_TOKEN),
         num_workers=0,
         pin_memory=True,
@@ -515,7 +507,7 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
     val_loader = DataLoader(
         val_dataset,
         batch_size=config.BATCH_SIZE,
-        shuffle=False,
+        shuffle=True,
         collate_fn=lambda batch: collate_fn_real(batch, config.PAD_TOKEN),
         num_workers=0,
         pin_memory=True,
@@ -524,7 +516,7 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
     test_loader = DataLoader(
         test_dataset,
         batch_size=config.BATCH_SIZE,
-        shuffle=False,
+        shuffle=True,
         collate_fn=lambda batch: collate_fn_real(batch, config.PAD_TOKEN),
         num_workers=0,
         pin_memory=True,

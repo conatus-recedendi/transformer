@@ -170,8 +170,8 @@ class Transformer(nn.Module):
             encoder_output,
             tgt_mask=tgt_mask,
             memory_mask=None,  # Usually not used
-            tgt_key_padding_mask=tgt_key_padding_mask,
-            memory_key_padding_mask=memory_key_padding_mask,
+            tgt_key_padding_mask=None,
+            memory_key_padding_mask=None,
         )
 
         # Output projection to vocabulary

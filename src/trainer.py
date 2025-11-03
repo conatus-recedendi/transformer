@@ -670,6 +670,24 @@ class Trainer:
                         f"   {i+1}. Token {token:>6} ({prob:.2%}) → '{token_text}'"
                     )
 
+                second_pos_probs = torch.softmax(logits_sample[0], dim=-1)
+                top5_probs, top5_tokens = torch.topk(second_pos_probs, 5)
+                self.logger.info(f" 두 번째 위치 Top-5 예측:")
+                for i, (token, prob) in enumerate(
+                    zip(top5_tokens.cpu().tolist(), top5_probs.cpu().tolist())
+                ):
+                    try:
+                        if hasattr(self.vocab, "decode"):
+                            token_text = self.vocab.decode([token])
+                        else:
+                            token_text = str(token)
+                    except:
+                        token_text = f"<ERR:{token}>"
+
+                    self.logger.info(
+                        f"   {i+1}. Token {token:>6} ({prob:.2%}) → '{token_text}'"
+                    )
+
             # 토큰별 비교 (처음 5개)
             self.logger.info(f"🔄 위치별 예측 vs 정답 (처음 5개):")
             compare_len = min(5, len(predicted_tokens), len(tgt_output_sample))
