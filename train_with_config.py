@@ -283,7 +283,9 @@ def load_config_from_json(config_path: str) -> Config:
         model = config_dict["model"]
         flattened_config.update(
             {
-                "MODEL_TYPE": model.get("model_type", "custom"),  # "custom" or "pytorch"
+                "MODEL_TYPE": model.get(
+                    "model_type", "custom"
+                ),  # "custom" or "pytorch"
                 "MODEL_DIM": model.get("model_dim", 512),
                 "NUM_HEADS": model.get("num_heads", 8),
                 "NUM_ENCODER_LAYERS": model.get("num_encoder_layers", 6),
@@ -512,7 +514,7 @@ def load_data(config: Config, use_dummy: bool = True):
 def create_model_from_config(config: Config) -> torch.nn.Module:
     """Create Transformer model from configuration"""
     logger = logging.getLogger(__name__)
-    
+
     # 모델 타입 확인
     model_type = getattr(config, "MODEL_TYPE", "custom")
     logger.info(f"🤖 Creating {model_type.upper()} Transformer model...")
@@ -528,7 +530,7 @@ def create_model_from_config(config: Config) -> torch.nn.Module:
     if model_type.lower() == "pytorch":
         # PyTorch 내장 Transformer 사용
         from src.pytorch_transformer import PyTorchTransformerWrapper
-        
+
         logger.info("Using PyTorch nn.Transformer implementation")
         model = PyTorchTransformerWrapper(
             src_vocab_size=src_vocab_size,
@@ -656,7 +658,7 @@ def main():
     logger.info(f"  Vocabulary Size: {config.VOCAB_SIZE}")
     logger.info(f"  Max Sequence Length: {config.MAX_SEQ_LENGTH}")
     logger.info(f"  Dropout: {config.DROPOUT}")
-    if getattr(config, 'MODEL_TYPE', 'custom').lower() == 'custom':
+    if getattr(config, "MODEL_TYPE", "custom").lower() == "custom":
         logger.info(f"  Key Dimension (kdim): {config.KDIM}")
         logger.info(f"  Value Dimension (vdim): {config.VDIM}")
 

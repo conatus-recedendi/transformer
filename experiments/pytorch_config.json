@@ -1,7 +1,7 @@
 {
   "experiment_name": "pytorch_transformer_base",
   "description": "Base configuration using PyTorch nn.Transformer",
-  
+
   "model": {
     "model_type": "pytorch",
     "model_dim": 512,
@@ -12,7 +12,7 @@
     "dropout": 0.1,
     "max_seq_length": 512
   },
-  
+
   "training": {
     "batch_size": 32,
     "learning_rate": 1e-4,
@@ -25,7 +25,7 @@
     "debug_output_every": 100,
     "enable_output_debug": false
   },
-  
+
   "data": {
     "dataset": "wmt14_en_de",
     "vocab_size": 37000,
@@ -43,7 +43,7 @@
     "src_lang": "en",
     "tgt_lang": "de"
   },
-  
+
   "evaluation": {
     "eval_every": 500,
     "save_every": 1000,
@@ -51,7 +51,7 @@
     "beam_size": 4,
     "length_penalty": 0.6
   },
-  
+
   "paths": {
     "data_path": "data/",
     "model_save_path": "checkpoints/",
