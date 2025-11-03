@@ -153,8 +153,8 @@ class Transformer(nn.Module):
         x = self.embedding(src) * math.sqrt(
             self.d_model
         )  # [batch_size, src_len, d_model] Input embedding with scaling
-        x += self.pos_encoding(src)
-        # x = self.dropout(x)
+        x = self.pos_encoding(x)
+        x = self.dropout(x)
         # Encoder forward pass
         encoder_output = self.encoder(
             x, src_mask=src_mask, src_key_padding_mask=src_key_padding_mask
@@ -162,8 +162,8 @@ class Transformer(nn.Module):
         y = self.embedding(tgt) * math.sqrt(
             self.d_model
         )  # [batch_size, tgt_len, d_model] Input embedding with scaling
-        y += self.pos_encoding(tgt)
-        # y = self.dropout(y)
+        y = self.pos_encoding(y)
+        y = self.dropout(y)
         # Decoder forward pass
         decoder_output = self.decoder(
             y,
