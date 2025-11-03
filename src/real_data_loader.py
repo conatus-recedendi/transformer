@@ -333,11 +333,11 @@ class RealWMTDataset(Dataset):
         tgt_input = (
             [self.vocab.special_tokens["<BOS>"]]
             + tgt_ids
-            + [self.vocab.special_tokens["<EOS>"]]
+            # + [self.vocab.special_tokens["<EOS>"]]
         )
         tgt_output = (
-            [self.vocab.special_tokens["<BOS>"]]
-            + tgt_ids
+            # [self.vocab.special_tokens["<BOS>"]]
+            tgt_ids
             + [self.vocab.special_tokens["<EOS>"]]
         )
 
