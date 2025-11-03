@@ -45,6 +45,7 @@ class Config:
         self.TGT_VOCAB_SIZE = 37000
         self.SHARED_VOCAB = True
         self.ENCODING = "bpe"
+        self.APPLY_DATA_CLEANING = True  # Apply Tensor2Tensor cleaning rules
         self.APPROXIMATE_SENTENCE_PAIRS = 4500000
         self.TRAIN_PAIRS = 4500000
         self.VAL_PAIRS = 500000

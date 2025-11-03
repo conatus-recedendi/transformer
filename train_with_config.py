@@ -331,6 +331,7 @@ def load_config_from_json(config_path: str) -> Config:
                 ),
                 "SHARED_VOCAB": data.get("shared_vocab", True),
                 "ENCODING": data.get("encoding", "bpe"),
+                "APPLY_DATA_CLEANING": data.get("apply_data_cleaning", True),
                 "APPROXIMATE_SENTENCE_PAIRS": data.get(
                     "approximate_sentence_pairs", 4500000
                 ),

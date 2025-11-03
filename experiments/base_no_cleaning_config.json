@@ -1,9 +1,9 @@
 {
-  "experiment_name": "transformer_base_original",
-  "description": "Base Transformer model configuration as described in 'Attention is All You Need' - Original Paper Implementation",
+  "experiment_name": "transformer_base_no_cleaning",
+  "description": "Base Transformer model without data cleaning - Raw WMT14 data",
 
   "model": {
-    "model_type": "pytorch",
+    "model_type": "custom",
     "model_dim": 512,
     "num_heads": 8,
     "num_encoder_layers": 6,
@@ -36,7 +36,7 @@
     "tgt_vocab_size": 37000,
     "shared_vocab": true,
     "encoding": "bpe",
-    "apply_data_cleaning": true,
+    "apply_data_cleaning": false,
     "approximate_sentence_pairs": 4520620,
     "train_pairs": 4520620,
     "val_pairs": 500000,
@@ -58,7 +58,7 @@
 
   "paths": {
     "data_path": "data/",
-    "model_save_path": "checkpoints/base_original/",
-    "log_path": "logs/base_original/"
+    "model_save_path": "checkpoints/base_no_cleaning/",
+    "log_path": "logs/base_no_cleaning/"
   }
 }

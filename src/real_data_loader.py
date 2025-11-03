@@ -188,11 +188,13 @@ class RealWMTDataset(Dataset):
         tgt_file: str,
         vocab: BPEVocabulary,
         max_length: int = 512,
+        apply_cleaning: bool = True,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
         self.vocab = vocab
         self.max_length = max_length
+        self.apply_cleaning = apply_cleaning
 
         # 데이터 로드
         self.data_pairs = self._load_data()
@@ -200,6 +202,7 @@ class RealWMTDataset(Dataset):
         logger.info(f"Loaded {len(self.data_pairs)} sentence pairs")
         logger.info(f"  Source file: {src_file}")
         logger.info(f"  Target file: {tgt_file}")
+        logger.info(f"  Data cleaning: {'Enabled' if apply_cleaning else 'Disabled'}")
 
     def _load_data(self) -> List[Tuple[str, str]]:
         """분리된 언어 파일들 로드 (BPE용으로 원문 텍스트 반환)"""
@@ -248,11 +251,13 @@ class RealWMTDataset(Dataset):
         # 🚨 강력한 파일 읽기 - newlines='\n'으로 단독 \r 문제 해결
         processed_pairs = 0
         skipped_pairs = 0
+        raw_src_sentences = []
+        raw_tgt_sentences = []
 
         with open(
-            self.src_file, "r", encoding="utf-8", errors="replace", newline="\n"
+            self.src_file, "r", encoding="utf-8", errors="replace", newlines="\n"
         ) as f_src, open(
-            self.tgt_file, "r", encoding="utf-8", errors="replace", newline="\n"
+            self.tgt_file, "r", encoding="utf-8", errors="replace", newlines="\n"
         ) as f_tgt:
 
             for line_num, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt), 1):
@@ -270,26 +275,47 @@ class RealWMTDataset(Dataset):
                     skipped_pairs += 1
                     continue
 
-                src_tokens = src_line.strip()
-                tgt_tokens = tgt_line.strip()
-
                 # 길이 제한 및 빈 라인 필터링
                 if (
-                    len(src_tokens) > 0
-                    and len(tgt_tokens) > 0
-                    and len(src_tokens) <= self.max_length
-                    and len(tgt_tokens) <= self.max_length
+                    len(src_line) > 0
+                    and len(tgt_line) > 0
+                    and len(src_line) <= self.max_length
+                    and len(tgt_line) <= self.max_length
                 ):
-                    data_pairs.append((src_tokens, tgt_tokens))
+                    raw_src_sentences.append(src_line)
+                    raw_tgt_sentences.append(tgt_line)
                     processed_pairs += 1
                 else:
                     skipped_pairs += 1
 
-        logger.info(f"✅ Data loading completed:")
+        logger.info(f"📊 Raw data loading completed:")
         logger.info(f"  Binary line count: {src_line_count:,}")
-        logger.info(f"  Processed pairs: {processed_pairs:,}")
-        logger.info(f"  Skipped pairs: {skipped_pairs:,}")
-        logger.info(f"  Success rate: {processed_pairs/src_line_count*100:.1f}%")
+        logger.info(f"  Raw processed pairs: {processed_pairs:,}")
+        logger.info(f"  Raw skipped pairs: {skipped_pairs:,}")
+
+        # 🧹 데이터 클리닝 적용 (설정에 따라)
+        apply_cleaning = getattr(self, "apply_cleaning", True)  # 기본값: True
+
+        if apply_cleaning:
+            from src.data_loader import clean_sentence_pairs
+
+            logger.info(f"🧹 Applying Tensor2Tensor data cleaning rules...")
+            cleaned_src, cleaned_tgt = clean_sentence_pairs(
+                raw_src_sentences, raw_tgt_sentences
+            )
+        else:
+            logger.info(f"⏭️ Skipping data cleaning (disabled in config)")
+            cleaned_src, cleaned_tgt = raw_src_sentences, raw_tgt_sentences
+
+        # 최종 데이터 쌍 생성
+        for src_text, tgt_text in zip(cleaned_src, cleaned_tgt):
+            data_pairs.append((src_text, tgt_text))
+
+        logger.info(f"✅ Final data loading completed:")
+        logger.info(f"  Final pairs: {len(data_pairs):,}")
+        logger.info(
+            f"  Overall success rate: {len(data_pairs)/src_line_count*100:.1f}%"
+        )
 
         return data_pairs
 
@@ -436,15 +462,31 @@ def load_real_wmt_data(config) -> Tuple[DataLoader, DataLoader, DataLoader]:
         logger.info("Training new BPE model...")
         vocab.train_bpe_model(vocab_files, config.VOCAB_SIZE, str(bpe_model_prefix))
 
+    # 데이터 클리닝 설정 가져오기
+    apply_cleaning = getattr(config, "APPLY_DATA_CLEANING", True)
+    logger.info(f"Data cleaning: {'Enabled' if apply_cleaning else 'Disabled'}")
+
     # 데이터셋 생성
     train_dataset = RealWMTDataset(
-        str(train_src_file), str(train_tgt_file), vocab, config.MAX_SEQ_LENGTH
+        str(train_src_file),
+        str(train_tgt_file),
+        vocab,
+        config.MAX_SEQ_LENGTH,
+        apply_cleaning,
     )
     val_dataset = RealWMTDataset(
-        str(valid_src_file), str(valid_tgt_file), vocab, config.MAX_SEQ_LENGTH
+        str(valid_src_file),
+        str(valid_tgt_file),
+        vocab,
+        config.MAX_SEQ_LENGTH,
+        apply_cleaning,
     )
     test_dataset = RealWMTDataset(
-        str(test_src_file), str(test_tgt_file), vocab, config.MAX_SEQ_LENGTH
+        str(test_src_file),
+        str(test_tgt_file),
+        vocab,
+        config.MAX_SEQ_LENGTH,
+        apply_cleaning,
     )
 
     logger.info(f"Dataset sizes:")

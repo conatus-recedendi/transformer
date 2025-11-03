@@ -33,6 +33,7 @@
     "tgt_vocab_size": 37000,
     "shared_vocab": true,
     "encoding": "bpe",
+    "apply_data_cleaning": true,
     "approximate_sentence_pairs": 4521000,
     "train_pairs": 4521000,
     "val_pairs": 500000,

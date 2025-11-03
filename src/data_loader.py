@@ -1,12 +1,137 @@
 """
 Data loading utilities for Transformer model
+Includes data cleaning functions from Tensor2Tensor
 """
 
 import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 import numpy as np
+import re
+import itertools
 from typing import List, Tuple, Optional, Dict, Any
+
+
+# Data cleaning patterns from Tensor2Tensor
+_RE_GOOD_S_START = re.compile(r'^["""]?[A-Z]')
+_RE_GOOD_S_END = re.compile(r'\w[.?!][""]?$', re.UNICODE)
+
+_RE_LABEL_COLON = re.compile(r"^\w+\.?( \w+)?: ", re.UNICODE)
+_RE_DIGIT_SPACE_DIGIT = re.compile(r"\d +\d", re.UNICODE)
+_RE_ALL_CAP_WORDS = re.compile(r"^[A-Z]\S*(\s+[A-Z]\S+)+\s*$")
+
+_RE_DQ_ONE = re.compile(r'^[^"""]*["""][^"""]*$')
+_RE_DQ_INITIAL = re.compile(r'^["""]([^"""]+)$')
+_RE_DQ_FINAL = re.compile(r'^[^"""]+["""]$')
+_RE_DQ_LINE = re.compile(r'^["""].*["""]$')
+
+_RE_DQ_MANY = re.compile(r'(["""].*){3,}')
+_RE_SQ_MANY = re.compile(r"(['''][^st].*){3,}")
+_RE_CHARS_QQ = re.compile(r"[\"\"\"''']\\s*[\"\"\"''']")
+_RE_SPACE_PUNCT_SPACE = re.compile(r"\\s[\"\"\"''',:;]\\s")
+
+_RE_COPYRIGHT = re.compile(r"©|^Copyright|^\(C\)")
+_RE_UNMATCHED_PAREN_LEFT = re.compile(r"[(][^)]*$")
+_RE_UNMATCHED_PAREN_RIGHT = re.compile(r"^[^(]*[)]")
+_RE_TAGLINE_CITY = re.compile(r"^[A-Z]{2,}(\s+[A-Z]+)*\s+-")
+_RE_CHARS_UPPER_UNDERSCORE = re.compile(r"^[A-Z]+[a-z]*_")
+
+
+def clean_sentence_pairs(
+    src_sentences: List[str], tgt_sentences: List[str]
+) -> Tuple[List[str], List[str]]:
+    """
+    Clean and filter sentence pairs using Tensor2Tensor cleaning rules
+
+    Args:
+        src_sentences: List of source sentences
+        tgt_sentences: List of target sentences
+
+    Returns:
+        Tuple of (cleaned_src, cleaned_tgt) lists
+    """
+    cleaned_src = []
+    cleaned_tgt = []
+
+    total_pairs = len(src_sentences)
+    filtered_count = 0
+    split_count = 0
+
+    for src, tgt in zip(src_sentences, tgt_sentences):
+        if _regex_filter(src):
+            filtered_count += 1
+            continue
+
+        src_list, tgt_list = _split_sentences(src, tgt)
+
+        if len(src_list) != len(tgt_list):
+            filtered_count += 1
+            continue  # discard this pair
+        elif len(src_list) == 1:
+            cleaned_src.append(src)
+            cleaned_tgt.append(tgt)
+        else:
+            split_count += len(src_list)
+            for src_sub, tgt_sub in zip(src_list, tgt_list):
+                if _regex_filter(src_sub):
+                    continue
+                cleaned_src.append(src_sub)
+                cleaned_tgt.append(tgt_sub)
+
+    print(f"Data cleaning results:")
+    print(f"  Original pairs: {total_pairs:,}")
+    print(f"  Filtered out: {filtered_count:,}")
+    print(f"  Split sentences: {split_count:,}")
+    print(f"  Final pairs: {len(cleaned_src):,}")
+    print(f"  Retention rate: {len(cleaned_src)/total_pairs*100:.1f}%")
+
+    return cleaned_src, cleaned_tgt
+
+
+def _regex_filter(sentence: str) -> bool:
+    """Apply regex filters to determine if sentence should be discarded"""
+    return (
+        not _is_match(sentence, _RE_GOOD_S_START)
+        or not _is_match(sentence, _RE_GOOD_S_END)
+        or _is_match(sentence, _RE_LABEL_COLON)
+        or _is_match(sentence, _RE_DIGIT_SPACE_DIGIT)
+        or _is_match(sentence, _RE_DQ_ONE)
+        or _is_match(sentence, _RE_DQ_INITIAL)
+        or _is_match(sentence, _RE_DQ_FINAL)
+        or _is_match(sentence, _RE_DQ_LINE)
+        or _is_match(sentence, _RE_DQ_MANY)
+        or _is_match(sentence, _RE_SQ_MANY)
+        or _is_match(sentence, _RE_CHARS_QQ)
+        or _is_match(sentence, _RE_SPACE_PUNCT_SPACE)
+        or _is_match(sentence, _RE_COPYRIGHT)
+        or _is_match(sentence, _RE_UNMATCHED_PAREN_LEFT)
+        or _is_match(sentence, _RE_UNMATCHED_PAREN_RIGHT)
+        or _is_match(sentence, _RE_TAGLINE_CITY)
+        or _is_match(sentence, _RE_CHARS_UPPER_UNDERSCORE)
+    )
+
+
+def _is_match(sentence: str, regex) -> bool:
+    """Check if regex matches the sentence"""
+    return regex.search(sentence) is not None
+
+
+def _split_sentences(s1: str, s2: str) -> Tuple[List[str], List[str]]:
+    """Split sentences at sentence boundaries"""
+    # Convert to unicode if needed
+    if isinstance(s1, bytes):
+        s1 = s1.decode("utf-8", errors="ignore")
+    if isinstance(s2, bytes):
+        s2 = s2.decode("utf-8", errors="ignore")
+
+    # Split sentences using regex patterns
+    s1 = re.sub(r"(\w[A-Z]|[0-9a-z])([.!?]) ([A-Z])", r"\1\2__|__\3", s1)
+    s2 = re.sub(r"([^0-9][.!?]) ([A-Z])", r"\1__|__\2", s2)
+
+    s1_subsentences = s1.split("__|__")
+    s2_subsentences = s2.split("__|__")
+
+    return s1_subsentences, s2_subsentences
 
 
 class TransformerDataset(Dataset):
