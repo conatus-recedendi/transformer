@@ -154,7 +154,7 @@ class Transformer(nn.Module):
             self.d_model
         )  # [batch_size, src_len, d_model] Input embedding with scaling
         x += self.pos_encoding(src)
-        x = self.dropout(x)
+        # x = self.dropout(x)
         # Encoder forward pass
         encoder_output = self.encoder(
             x, src_mask=src_mask, src_key_padding_mask=src_key_padding_mask
@@ -163,15 +163,15 @@ class Transformer(nn.Module):
             self.d_model
         )  # [batch_size, tgt_len, d_model] Input embedding with scaling
         y += self.pos_encoding(tgt)
-        y = self.dropout(y)
+        # y = self.dropout(y)
         # Decoder forward pass
         decoder_output = self.decoder(
             y,
             encoder_output,
             tgt_mask=tgt_mask,
             memory_mask=None,  # Usually not used
-            tgt_key_padding_mask=None,
-            memory_key_padding_mask=None,
+            tgt_key_padding_mask=tgt_key_padding_mask,
+            memory_key_padding_mask=memory_key_padding_mask,
         )
 
         # Output projection to vocabulary

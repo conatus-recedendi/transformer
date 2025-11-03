@@ -670,7 +670,7 @@ class Trainer:
                         f"   {i+1}. Token {token:>6} ({prob:.2%}) → '{token_text}'"
                     )
 
-                second_pos_probs = torch.softmax(logits_sample[0], dim=-1)
+                second_pos_probs = torch.softmax(logits_sample[1], dim=-1)
                 top5_probs, top5_tokens = torch.topk(second_pos_probs, 5)
                 self.logger.info(f" 두 번째 위치 Top-5 예측:")
                 for i, (token, prob) in enumerate(
