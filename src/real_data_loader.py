@@ -255,9 +255,9 @@ class RealWMTDataset(Dataset):
         raw_tgt_sentences = []
 
         with open(
-            self.src_file, "r", encoding="utf-8", errors="replace", newlines="\n"
+            self.src_file, "r", encoding="utf-8", errors="replace", newline="\n"
         ) as f_src, open(
-            self.tgt_file, "r", encoding="utf-8", errors="replace", newlines="\n"
+            self.tgt_file, "r", encoding="utf-8", errors="replace", newline="\n"
         ) as f_tgt:
 
             for line_num, (src_line, tgt_line) in enumerate(zip(f_src, f_tgt), 1):
