@@ -14,6 +14,7 @@ class Config:
         self.DESCRIPTION = "Base Transformer model configuration"
 
         # Model parameters (matching model section in JSON)
+        self.MODEL_TYPE = "custom"  # "custom" or "pytorch" - use custom implementation or PyTorch Transformer
         self.MODEL_DIM = 512
         self.NUM_HEADS = 8
         self.NUM_ENCODER_LAYERS = 6

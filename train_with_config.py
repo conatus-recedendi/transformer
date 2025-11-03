@@ -283,6 +283,7 @@ def load_config_from_json(config_path: str) -> Config:
         model = config_dict["model"]
         flattened_config.update(
             {
+                "MODEL_TYPE": model.get("model_type", "custom"),  # "custom" or "pytorch"
                 "MODEL_DIM": model.get("model_dim", 512),
                 "NUM_HEADS": model.get("num_heads", 8),
                 "NUM_ENCODER_LAYERS": model.get("num_encoder_layers", 6),
@@ -511,7 +512,10 @@ def load_data(config: Config, use_dummy: bool = True):
 def create_model_from_config(config: Config) -> torch.nn.Module:
     """Create Transformer model from configuration"""
     logger = logging.getLogger(__name__)
-    logger.info("🤖 Creating Transformer model...")
+    
+    # 모델 타입 확인
+    model_type = getattr(config, "MODEL_TYPE", "custom")
+    logger.info(f"🤖 Creating {model_type.upper()} Transformer model...")
 
     # 어휘 크기 결정
     if hasattr(config, "SRC_VOCAB_SIZE") and hasattr(config, "TGT_VOCAB_SIZE"):
@@ -521,22 +525,43 @@ def create_model_from_config(config: Config) -> torch.nn.Module:
         src_vocab_size = config.VOCAB_SIZE
         tgt_vocab_size = config.VOCAB_SIZE
 
-    model = Transformer(
-        src_vocab_size=src_vocab_size,
-        tgt_vocab_size=tgt_vocab_size,
-        d_model=config.MODEL_DIM,
-        num_heads=config.NUM_HEADS,
-        num_encoder_layers=config.NUM_ENCODER_LAYERS,
-        num_decoder_layers=config.NUM_DECODER_LAYERS,
-        d_ff=config.FFN_DIM,
-        max_seq_length=config.MAX_SEQ_LENGTH,
-        dropout=config.DROPOUT,
-        pad_token_id=config.PAD_TOKEN,
-        tie_weights=False,  # Tie embedding and output projection weights
-        kdim=config.KDIM,
-        vdim=config.VDIM,
-        device=config.DEVICE,
-    )
+    if model_type.lower() == "pytorch":
+        # PyTorch 내장 Transformer 사용
+        from src.pytorch_transformer import PyTorchTransformerWrapper
+        
+        logger.info("Using PyTorch nn.Transformer implementation")
+        model = PyTorchTransformerWrapper(
+            src_vocab_size=src_vocab_size,
+            tgt_vocab_size=tgt_vocab_size,
+            d_model=config.MODEL_DIM,
+            num_heads=config.NUM_HEADS,
+            num_encoder_layers=config.NUM_ENCODER_LAYERS,
+            num_decoder_layers=config.NUM_DECODER_LAYERS,
+            d_ff=config.FFN_DIM,
+            max_seq_length=config.MAX_SEQ_LENGTH,
+            dropout=config.DROPOUT,
+            pad_token_id=config.PAD_TOKEN,
+            device=config.DEVICE,
+        )
+    else:
+        # 커스텀 Transformer 구현 사용
+        logger.info("Using custom Transformer implementation")
+        model = Transformer(
+            src_vocab_size=src_vocab_size,
+            tgt_vocab_size=tgt_vocab_size,
+            d_model=config.MODEL_DIM,
+            num_heads=config.NUM_HEADS,
+            num_encoder_layers=config.NUM_ENCODER_LAYERS,
+            num_decoder_layers=config.NUM_DECODER_LAYERS,
+            d_ff=config.FFN_DIM,
+            max_seq_length=config.MAX_SEQ_LENGTH,
+            dropout=config.DROPOUT,
+            pad_token_id=config.PAD_TOKEN,
+            tie_weights=False,  # Tie embedding and output projection weights
+            kdim=config.KDIM,
+            vdim=config.VDIM,
+            device=config.DEVICE,
+        )
 
     return model
 
@@ -554,6 +579,13 @@ def main():
         "--use-dummy-data",
         action="store_true",
         help="Use dummy data instead of real data",
+    )
+    parser.add_argument(
+        "--model-type",
+        type=str,
+        default=None,
+        choices=["custom", "pytorch"],
+        help="Model type to use (overrides config file): 'custom' for custom implementation, 'pytorch' for PyTorch nn.Transformer",
     )
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument(
@@ -602,6 +634,11 @@ def main():
         device = get_device()
         config.DEVICE = str(device)
 
+    # Override model type if specified
+    if args.model_type is not None:
+        config.MODEL_TYPE = args.model_type
+        logger.info(f"Model type overridden to: {args.model_type}")
+
     # Set random seed
     set_seed(args.seed)
 
@@ -610,6 +647,7 @@ def main():
     logger.info("=" * 60)
 
     logger.info("\nModel Configuration:")
+    logger.info(f"  Model Type: {getattr(config, 'MODEL_TYPE', 'custom').upper()}")
     logger.info(f"  Model Dimension: {config.MODEL_DIM}")
     logger.info(f"  Number of Heads: {config.NUM_HEADS}")
     logger.info(f"  Encoder Layers: {config.NUM_ENCODER_LAYERS}")
@@ -618,8 +656,9 @@ def main():
     logger.info(f"  Vocabulary Size: {config.VOCAB_SIZE}")
     logger.info(f"  Max Sequence Length: {config.MAX_SEQ_LENGTH}")
     logger.info(f"  Dropout: {config.DROPOUT}")
-    logger.info(f"  Key Dimension (kdim): {config.KDIM}")
-    logger.info(f"  Value Dimension (vdim): {config.VDIM}")
+    if getattr(config, 'MODEL_TYPE', 'custom').lower() == 'custom':
+        logger.info(f"  Key Dimension (kdim): {config.KDIM}")
+        logger.info(f"  Value Dimension (vdim): {config.VDIM}")
 
     logger.info("\nTraining Configuration:")
     logger.info(f"  Batch Size: {config.BATCH_SIZE}")
