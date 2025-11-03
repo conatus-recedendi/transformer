@@ -66,12 +66,10 @@ class PyTorchTransformerWrapper(nn.Module):
         self.device_name = device
 
         # 임베딩 레이어
-        self.src_embedding = nn.Embedding(
-            src_vocab_size, d_model, padding_idx=pad_token_id
-        )
-        self.tgt_embedding = nn.Embedding(
-            tgt_vocab_size, d_model, padding_idx=pad_token_id
-        )
+        self.embedding = nn.Embedding(src_vocab_size, d_model, padding_idx=pad_token_id)
+        # self.tgt_embedding = nn.Embedding(
+        #     tgt_vocab_size, d_model, padding_idx=pad_token_id
+        # )
 
         # 위치 인코딩
         self.pos_encoding = PositionalEncoding(d_model, max_seq_length)
@@ -88,7 +86,10 @@ class PyTorchTransformerWrapper(nn.Module):
         )
 
         # 출력 프로젝션
+        # self.output_projection = nn.Linear(d_model, tgt_vocab_size)
         self.output_projection = nn.Linear(d_model, tgt_vocab_size)
+
+        self.output_projection.weight = self.embedding.weight
 
         # 임베딩 스케일링
         self.embedding_scale = math.sqrt(d_model)
@@ -151,10 +152,10 @@ class PyTorchTransformerWrapper(nn.Module):
 
         # 임베딩 + 위치 인코딩
         src_emb = (
-            self.src_embedding(src) * self.embedding_scale
+            self.embedding(src) * self.embedding_scale
         )  # [batch_size, src_seq_len, d_model]
         tgt_emb = (
-            self.tgt_embedding(tgt) * self.embedding_scale
+            self.embedding(tgt) * self.embedding_scale
         )  # [batch_size, tgt_seq_len, d_model]
 
         # PyTorch Transformer는 [seq_len, batch_size, d_model] 형식 요구
@@ -192,7 +193,7 @@ class PyTorchTransformerWrapper(nn.Module):
         if src_key_padding_mask is None:
             src_key_padding_mask = self._create_padding_mask(src)
 
-        src_emb = self.src_embedding(src) * self.embedding_scale
+        src_emb = self.embedding(src) * self.embedding_scale
         src_emb = src_emb.transpose(0, 1)  # [src_seq_len, batch_size, d_model]
         src_emb = self.pos_encoding(src_emb)
 
@@ -216,7 +217,7 @@ class PyTorchTransformerWrapper(nn.Module):
 
         tgt_mask = self._generate_square_subsequent_mask(tgt_seq_len).to(tgt.device)
 
-        tgt_emb = self.tgt_embedding(tgt) * self.embedding_scale
+        tgt_emb = self.embedding(tgt) * self.embedding_scale
         tgt_emb = tgt_emb.transpose(0, 1)  # [tgt_seq_len, batch_size, d_model]
         tgt_emb = self.pos_encoding(tgt_emb)
 
