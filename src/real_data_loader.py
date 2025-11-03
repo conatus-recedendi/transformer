@@ -335,7 +335,11 @@ class RealWMTDataset(Dataset):
             + tgt_ids
             + [self.vocab.special_tokens["<EOS>"]]
         )
-        tgt_output = tgt_ids + [self.vocab.special_tokens["<EOS>"]]
+        tgt_output = (
+            [self.vocab.special_tokens["<BOS>"]]
+            + tgt_ids
+            + [self.vocab.special_tokens["<EOS>"]]
+        )
 
         return {
             "src": torch.tensor(src_ids, dtype=torch.long),
