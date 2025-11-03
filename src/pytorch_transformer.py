@@ -183,6 +183,7 @@ class PyTorchTransformerWrapper(nn.Module):
         logits = self.output_projection(
             output
         )  # [batch_size, tgt_seq_len, tgt_vocab_size]
+        logits = nn.Softmax(dim=-1)(logits)
 
         return logits
 
