@@ -608,18 +608,29 @@ def main():
 
     args = parser.parse_args()
 
+    # Create logs directory if it doesn't exist
+    os.makedirs("logs", exist_ok=True)
+
+    # Generate log filename with timestamp
+    from datetime import datetime
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_filename = f"logs/training_{timestamp}.log"
+
     # Setup logging BEFORE importing modules that use logging
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
             logging.StreamHandler(),  # Console output
+            logging.FileHandler(log_filename, encoding="utf-8"),  # File output
         ],
     )
 
     # Create logger for this module
     logger = logging.getLogger(__name__)
     logger.info("🚀 Starting Transformer training script...")
+    logger.info(f"📝 Log file: {log_filename}")
 
     # Check if config file exists
     if not os.path.exists(args.config):
