@@ -131,7 +131,9 @@ class BeamSearchDecoder:
     def decode(
         self,
         src: torch.Tensor,
+        tgt: torch.Tensor,
         src_mask: torch.Tensor,
+        tgt_mask: torch.Tensor,
         bos_token: int,
         eos_token: int,
         pad_token: int,
@@ -170,7 +172,7 @@ class BeamSearchDecoder:
                     continue
 
                 # Prepare decoder input
-                tgt = seq.unsqueeze(0)  # [1, seq_len]
+                tgt = tgt.unsqueeze(0)  # [1, seq_len]
                 tgt_len = tgt.size(1)
 
                 # Create target mask (causal mask)
@@ -190,6 +192,7 @@ class BeamSearchDecoder:
                     logits = model_output.reshape(
                         -1, model_output.size(-1)
                     )  # [1, vocab_size] - last position
+
                     log_probs = F.cross_entropy(logits, dim=-1)  # [1, vocab_size]
 
                 # Get top-k candidates
@@ -441,7 +444,9 @@ class ModelEvaluator:
                     try:
                         pred_tokens = beam_decoder.decode(
                             src=src_seq,
+                            tgt=tgt_seq,
                             src_mask=src_mask,
+                            tgt_mask=None,
                             bos_token=self.config.BOS_TOKEN,
                             eos_token=self.config.EOS_TOKEN,
                             pad_token=self.config.PAD_TOKEN,
