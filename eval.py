@@ -163,18 +163,18 @@ class BeamSearchDecoder:
         beams = [(torch.tensor([bos_token], device=self.device), 0.0, False)]
         finished_beams = []
 
+        tgt = tgt.unsqueeze(0)  # [1, seq_len]
+        tgt_len = tgt.size(1)
         for step in range(self.max_length):
             new_beams = []
 
             for seq, score, finished in beams:
-                logger.info("test0")
+
                 if finished:
                     finished_beams.append((seq, score, finished))
                     continue
 
                 # Prepare decoder input
-                tgt = tgt.unsqueeze(0)  # [1, seq_len]
-                tgt_len = tgt.size(1)
 
                 # Create target mask (causal mask)
                 tgt_mask = torch.tril(
