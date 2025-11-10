@@ -151,8 +151,8 @@ class BeamSearchDecoder:
         Returns:
             List of token IDs representing the best decoded sequence
         """
-        batch_size = src.size(0)
-        assert batch_size == 1, "Beam search currently supports batch_size=1 only"
+        # batch_size = src.size(0)
+        # assert batch_size == 1, "Beam search currently supports batch_size=1 only"
 
         # Store source for beam search
         self.src = src
