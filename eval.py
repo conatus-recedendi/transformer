@@ -199,9 +199,9 @@ class BeamSearchDecoder:
                 top_log_probs, top_indices = log_probs.topk(self.beam_size, dim=-1)
 
                 # Debug: log predictions for first step
-                if step == 0 and len(beams) == 1:
-                    # print(f"Step {step}: Top predictions: {top_indices.cpu().numpy()}")
-                    # print(f"Step {step}: Top log_probs: {top_log_probs.cpu().numpy()}")
+                # if step == 0 and len(beams) == 1:
+                # print(f"Step {step}: Top predictions: {top_indices.cpu().numpy()}")
+                # print(f"Step {step}: Top log_probs: {top_log_probs.cpu().numpy()}")
 
                 for i in range(self.beam_size):
                     token_id = top_indices[0, i].item()
