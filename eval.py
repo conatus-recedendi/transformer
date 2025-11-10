@@ -131,7 +131,9 @@ class BeamSearchDecoder:
     def decode(
         self,
         src: torch.Tensor,
+        tgt: torch.Tensor,
         src_mask: torch.Tensor,
+        tgt_mask: torch.Tensor,
         bos_token: int,
         eos_token: int,
         pad_token: int,
@@ -161,6 +163,8 @@ class BeamSearchDecoder:
         beams = [(torch.tensor([bos_token], device=self.device), 0.0, False)]
         finished_beams = []
 
+        current_tgt = tgt.unsqueeze(0)  # [1, current_seq_len]
+        current_tgt_len = current_tgt.size(1)
         for step in range(self.max_length):
             new_beams = []
 
@@ -440,7 +444,9 @@ class ModelEvaluator:
                     try:
                         pred_tokens = beam_decoder.decode(
                             src=src_seq,
+                            tgt=tgt_seq,
                             src_mask=src_mask,
+                            tgt_mask=None,
                             bos_token=self.config.BOS_TOKEN,
                             eos_token=self.config.EOS_TOKEN,
                             pad_token=self.config.PAD_TOKEN,
