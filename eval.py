@@ -151,8 +151,8 @@ class BeamSearchDecoder:
         Returns:
             List of token IDs representing the best decoded sequence
         """
-        # batch_size = src.size(0)
-        # assert batch_size == 1, "Beam search currently supports batch_size=1 only"
+        batch_size = src.size(0)
+        assert batch_size == 1, "Beam search currently supports batch_size=1 only"
 
         # Store source for beam search
         self.src = src
@@ -424,12 +424,12 @@ class ModelEvaluator:
 
                 for i in range(batch_size):
                     # Get single example
-                    src_seq = src[i]  # [src_len]
+                    src_seq = src[i : i + 1]  # [src_len]
                     tgt_seq = tgt_y[i]  # [tgt_len]
 
                     # 🔍 디버깅: 각 배치의 첫 번째 문장 상세 정보 출력
-                    # if i == 0:  # 각 배치의 첫 번째 문장만
-                    #     self._debug_batch_sample(batch_idx, src_seq, tgt_seq, vocab)
+                    if i == 0:  # 각 배치의 첫 번째 문장만
+                        self._debug_batch_sample(batch_idx, src_seq, tgt_seq, vocab)
 
                     # Create source mask (ignore padding)
                     src_mask = (src_seq != self.config.PAD_TOKEN).unsqueeze(
@@ -437,7 +437,7 @@ class ModelEvaluator:
                     )  # [1, 1, src_len]
 
                     # Set max output length: input_length + 50
-                    max_length = src_seq.size(0) + self.max_output_length_offset
+                    max_length = src_seq.size(1) + self.max_output_length_offset
                     beam_decoder.max_length = min(max_length, 512)
 
                     # Generate prediction using beam search
