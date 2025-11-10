@@ -414,7 +414,7 @@ class ModelEvaluator:
                 for i in range(batch_size):
                     # Get single example
                     src_seq = src[i : i + 1].unsqueeze(0)  # [1, src_len]
-                    tgt_seq = tgt_y[i].unsqueeze(0)  # [1, tgt_len]
+                    tgt_seq = tgt_y[i]  # [tgt_len]
 
                     # 🔍 디버깅: 각 배치의 첫 번째 문장 상세 정보 출력
                     if i == 0:  # 각 배치의 첫 번째 문장만
