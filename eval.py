@@ -182,7 +182,7 @@ class BeamSearchDecoder:
                 # Convert to attention mask format (False for allowed, True for masked)
                 # tgt_mask = ~tgt_mask  # Invert for attention mask
 
-                logger.info(self.src.shape)
+                # logger.info(self.src.shape)
                 # Forward pass using the complete model
                 with torch.no_grad():
                     # logger.debug(self.src.shape)
@@ -200,8 +200,8 @@ class BeamSearchDecoder:
 
                 # Debug: log predictions for first step
                 if step == 0 and len(beams) == 1:
-                    print(f"Step {step}: Top predictions: {top_indices.cpu().numpy()}")
-                    print(f"Step {step}: Top log_probs: {top_log_probs.cpu().numpy()}")
+                    # print(f"Step {step}: Top predictions: {top_indices.cpu().numpy()}")
+                    # print(f"Step {step}: Top log_probs: {top_log_probs.cpu().numpy()}")
 
                 for i in range(self.beam_size):
                     token_id = top_indices[0, i].item()
