@@ -456,7 +456,8 @@ class ModelEvaluator:
 
                         # 🔍 디버깅: 첫 번째 문장의 예측 결과 상세 정보
                         if i == 0:
-                            self._debug_prediction_batch_idx, pred_tokens, tgt_seq, vocab
+                            self._debug_prediction_result(
+                                batch_idx, pred_tokens, tgt_seq, vocab
                             )
 
                     except Exception as e:
