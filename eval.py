@@ -177,8 +177,11 @@ class BeamSearchDecoder:
                 # Convert to attention mask format (False for allowed, True for masked)
                 # tgt_mask = ~tgt_mask  # Invert for attention mask
 
+                self.logger.info(self.src.shape)
                 # Forward pass using the complete model
                 with torch.no_grad():
+                    # logger.debug(self.src.shape)
+
                     # Use full model forward pass
                     model_output = self.model(self.src, tgt)  # [1, seq_len, vocab_size]
                     logits = model_output[:, -1, :]  # [1, vocab_size] - last position
@@ -413,7 +416,7 @@ class ModelEvaluator:
 
                 for i in range(batch_size):
                     # Get single example
-                    src_seq = src[i : i + 1].unsqueeze(0)  # [1, src_len]
+                    src_seq = src[i : i + 1]  # [src_len]
                     tgt_seq = tgt_y[i]  # [tgt_len]
 
                     # 🔍 디버깅: 각 배치의 첫 번째 문장 상세 정보 출력
