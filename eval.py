@@ -185,7 +185,6 @@ class BeamSearchDecoder:
 
                 # logger.info(self.src.shape)
                 # Forward pass using the complete model
-                logger.info("test1")
                 with torch.no_grad():
                     # logger.debug(self.src.shape)
 
@@ -204,7 +203,6 @@ class BeamSearchDecoder:
                 # if step == 0 and len(beams) == 1:
                 # print(f"Step {step}: Top predictions: {top_indices.cpu().numpy()}")
                 # print(f"Step {step}: Top log_probs: {top_log_probs.cpu().numpy()}")
-                logger.info("test2")
                 for i in range(self.beam_size):
                     token_id = top_indices[0, i].item()
                     token_log_prob = top_log_probs[0, i].item()
