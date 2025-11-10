@@ -175,8 +175,8 @@ class BeamSearchDecoder:
                     continue
 
                 # Prepare decoder input - 현재 생성 중인 시퀀스 사용
-                current_tgt = seq.unsqueeze(0)  # [1, current_seq_len]
-                current_tgt_len = current_tgt.size(1)
+                # current_tgt = seq.unsqueeze(0)  # [1, current_seq_len]
+                # current_tgt_len = current_tgt.size(1)
 
                 # Create target mask (causal mask) - 현재 시퀀스 길이에 맞춰 동적 생성
                 tgt_mask = torch.tril(
