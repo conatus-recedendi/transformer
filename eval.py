@@ -194,10 +194,10 @@ class BeamSearchDecoder:
                     logits = model_output[
                         :, -1, :
                     ]  # [1, vocab_size] - last position only
-                    log_probs = F.log_softmax(logits, dim=-1)  # [1, vocab_size]
+                    # log_probs = F.log_softmax(logits, dim=-1)  # [1, vocab_size]
 
                 # Get top-k candidates
-                top_log_probs, top_indices = log_probs.topk(self.beam_size, dim=-1)
+                top_log_probs, top_indices = logits.topk(self.beam_size, dim=-1)
 
                 # Debug: log predictions for first step
                 # if step == 0 and len(beams) == 1:
