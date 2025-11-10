@@ -187,8 +187,10 @@ class BeamSearchDecoder:
 
                     # Use full model forward pass
                     model_output = self.model(self.src, tgt)  # [1, seq_len, vocab_size]
-                    logits = model_output[:, -1, :]  # [1, vocab_size] - last position
-                    log_probs = F.log_softmax(logits, dim=-1)  # [1, vocab_size]
+                    logits = model_output.reshape(
+                        -1, model_output.size(-1)
+                    )  # [1, vocab_size] - last position
+                    log_probs = F.cross_entropy(logits, dim=-1)  # [1, vocab_size]
 
                 # Get top-k candidates
                 top_log_probs, top_indices = log_probs.topk(self.beam_size, dim=-1)
