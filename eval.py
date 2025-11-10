@@ -425,6 +425,7 @@ class ModelEvaluator:
                 for i in range(batch_size):
                     # Get single example
                     src_seq = src[i : i + 1]  # [src_len]
+                    logger.info(src_seq)
                     tgt_seq = tgt_y[i]  # [tgt_len]
 
                     # 🔍 디버깅: 각 배치의 첫 번째 문장 상세 정보 출력
