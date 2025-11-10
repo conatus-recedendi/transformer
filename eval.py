@@ -35,6 +35,9 @@ except ImportError:
 from collections import Counter
 import math
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class SimpleBleuCalculator:
     """Simple BLEU calculator when sacrebleu is not available"""
@@ -177,7 +180,7 @@ class BeamSearchDecoder:
                 # Convert to attention mask format (False for allowed, True for masked)
                 # tgt_mask = ~tgt_mask  # Invert for attention mask
 
-                self.logger.info(self.src.shape)
+                logger.info(self.src.shape)
                 # Forward pass using the complete model
                 with torch.no_grad():
                     # logger.debug(self.src.shape)
