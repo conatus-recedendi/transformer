@@ -428,8 +428,8 @@ class ModelEvaluator:
                     tgt_seq = tgt_y[i]  # [tgt_len]
 
                     # 🔍 디버깅: 각 배치의 첫 번째 문장 상세 정보 출력
-                    if i == 0:  # 각 배치의 첫 번째 문장만
-                        self._debug_batch_sample(batch_idx, src_seq, tgt_seq, vocab)
+                    # if i == 0:  # 각 배치의 첫 번째 문장만
+                    #     self._debug_batch_sample(batch_idx, src_seq, tgt_seq, vocab)
 
                     # Create source mask (ignore padding)
                     src_mask = (src_seq != self.config.PAD_TOKEN).unsqueeze(
