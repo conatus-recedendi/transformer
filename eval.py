@@ -437,7 +437,7 @@ class ModelEvaluator:
                     )  # [1, 1, src_len]
 
                     # Set max output length: input_length + 50
-                    max_length = src_seq.size(1) + self.max_output_length_offset
+                    max_length = src_seq.size(0) + self.max_output_length_offset
                     beam_decoder.max_length = min(max_length, 512)
 
                     # Generate prediction using beam search
