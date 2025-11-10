@@ -167,6 +167,7 @@ class BeamSearchDecoder:
             new_beams = []
 
             for seq, score, finished in beams:
+                logger.info("test0")
                 if finished:
                     finished_beams.append((seq, score, finished))
                     continue
@@ -184,6 +185,7 @@ class BeamSearchDecoder:
 
                 # logger.info(self.src.shape)
                 # Forward pass using the complete model
+                logger.info("test1")
                 with torch.no_grad():
                     # logger.debug(self.src.shape)
 
@@ -202,7 +204,7 @@ class BeamSearchDecoder:
                 # if step == 0 and len(beams) == 1:
                 # print(f"Step {step}: Top predictions: {top_indices.cpu().numpy()}")
                 # print(f"Step {step}: Top log_probs: {top_log_probs.cpu().numpy()}")
-
+                logger.info("test2")
                 for i in range(self.beam_size):
                     token_id = top_indices[0, i].item()
                     token_log_prob = top_log_probs[0, i].item()
@@ -454,8 +456,7 @@ class ModelEvaluator:
 
                         # 🔍 디버깅: 첫 번째 문장의 예측 결과 상세 정보
                         if i == 0:
-                            self._debug_prediction_result(
-                                batch_idx, pred_tokens, tgt_seq, vocab
+                            self._debug_prediction_batch_idx, pred_tokens, tgt_seq, vocab
                             )
 
                     except Exception as e:
