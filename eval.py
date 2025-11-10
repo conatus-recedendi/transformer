@@ -131,9 +131,7 @@ class BeamSearchDecoder:
     def decode(
         self,
         src: torch.Tensor,
-        tgt: torch.Tensor,
         src_mask: torch.Tensor,
-        tgt_mask: torch.Tensor,
         bos_token: int,
         eos_token: int,
         pad_token: int,
@@ -163,8 +161,6 @@ class BeamSearchDecoder:
         beams = [(torch.tensor([bos_token], device=self.device), 0.0, False)]
         finished_beams = []
 
-        tgt = tgt.unsqueeze(0)  # [1, seq_len]
-        tgt_len = tgt.size(1)
         for step in range(self.max_length):
             new_beams = []
 
@@ -174,26 +170,26 @@ class BeamSearchDecoder:
                     finished_beams.append((seq, score, finished))
                     continue
 
-                # Prepare decoder input
+                # Prepare decoder input - 현재 생성 중인 시퀀스 사용
+                current_tgt = seq.unsqueeze(0)  # [1, current_seq_len]
+                current_tgt_len = current_tgt.size(1)
 
-                # Create target mask (causal mask)
+                # Create target mask (causal mask) - 현재 시퀀스 길이에 맞춰 동적 생성
                 tgt_mask = torch.tril(
-                    torch.ones(tgt_len, tgt_len, device=self.device)
+                    torch.ones(current_tgt_len, current_tgt_len, device=self.device)
                 ).bool()
-                # Convert to attention mask format (False for allowed, True for masked)
-                # tgt_mask = ~tgt_mask  # Invert for attention mask
 
-                # logger.info(self.src.shape)
                 # Forward pass using the complete model
                 with torch.no_grad():
-                    # logger.debug(self.src.shape)
+                    # Use full model forward pass with current sequence
+                    model_output = self.model(
+                        self.src, current_tgt
+                    )  # [1, current_seq_len, vocab_size]
 
-                    # Use full model forward pass
-                    model_output = self.model(self.src, tgt)  # [1, seq_len, vocab_size]
-                    logits = model_output.reshape(
-                        -1, model_output.size(-1)
-                    )  # [1, vocab_size] - last position
-
+                    # Get logits for the last position only
+                    logits = model_output[
+                        :, -1, :
+                    ]  # [1, vocab_size] - last position only
                     log_probs = F.log_softmax(logits, dim=-1)  # [1, vocab_size]
 
                 # Get top-k candidates
@@ -444,9 +440,7 @@ class ModelEvaluator:
                     try:
                         pred_tokens = beam_decoder.decode(
                             src=src_seq,
-                            tgt=tgt_seq,
                             src_mask=src_mask,
-                            tgt_mask=None,
                             bos_token=self.config.BOS_TOKEN,
                             eos_token=self.config.EOS_TOKEN,
                             pad_token=self.config.PAD_TOKEN,
