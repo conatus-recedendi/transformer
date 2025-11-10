@@ -175,7 +175,7 @@ class BeamSearchDecoder:
                     torch.ones(tgt_len, tgt_len, device=self.device)
                 ).bool()
                 # Convert to attention mask format (False for allowed, True for masked)
-                tgt_mask = ~tgt_mask  # Invert for attention mask
+                # tgt_mask = ~tgt_mask  # Invert for attention mask
 
                 # Forward pass using the complete model
                 with torch.no_grad():
